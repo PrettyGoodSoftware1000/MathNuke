@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GALAGO: Direct Load</title>
+    <style>
+        body {
+            background-color: #1a1a2e;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            overflow: hidden;
+        }
+        h1 { margin-bottom: 10px; text-shadow: 2px 2px #ff0055; font-size: 48px; }
+        
+        #gameContainer {
+            position: relative;
+            border: 4px solid #444;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        
+        canvas {
+            background-color: #000;
+            display: block;
+            outline: none;
+        }
+
+        .controls-info {
+            background: #333; padding: 10px; margin-top: 10px;
+            font-size: 0.8em; text-align: center; width: 800px;
+        }
+
+        /* The Custom Button */
+        #customBtn {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            background-color: #252540;
+            color: #707090;
+            border: 1px solid #303050;
+            padding: 10px 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            z-index: 1000;
+        }
+        #customBtn:hover {
+            background-color: #353555;
+            color: #fff;
+            border-color: #606080;
+        }
+        
+        /* Notification toast for file load */
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #222;
+            color: #0f0;
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid #444;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>GALAGO</h1>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600" tabindex="1"></canvas>
+    </div>
+
+    <div class="controls-info">
+        <strong>P1:</strong> Arrows Move, CTRL/SHIFT Shoot <br>
+        <strong>P2:</strong> Stick Move, 'A' Shoot <br>
+        <strong>System:</strong> Press 'B' to toggle Stars
+    </div>
+
+    <input type="file" id="hiddenFileInput" style="display: none;" accept=".txt">
+    
+    <button id="customBtn">Custom (Load enemies.txt)</button>
+    
+    <div id="toast">Config Loaded!</div>
+
+<script>
+// --- 1. SETUP CONSTANTS & STATE ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const WIDTH = 800;
+const HEIGHT = 600;
+
+let lastTime = 0;
+let gameStarted = false;
+let gameOver = false;
+let animFrame = 0;
+let showStars = false;
+
+// Audio
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+// Inputs
+const keys = {};
+let gamepadIndex = null;
+let enemyConfig = { chargers: [], shooters: [], fatties: [] };
+
+// --- 2. ASSETS ---
+function generateSprite(type) {
+    const c = document.createElement('canvas'); const x = c.getContext('2d');
+    let scale = 4, w=32, h=32, colors=[], pattern=[];
+
+    if(type.includes('p1')) {
+        w=64; h=64; colors=['#ff0000','#ff7700','#ffff00'];
+        pattern = ["00000010000000","00000111000000","00001121100000","00011222110000","00112202211000","01122000221100","11220000022110","12200000002210","12200000002210","11220000022110","01122000221100","00112202211000","00011222110000","00001121100000","00000111000000","00000010000000"];
+    } else if (type.includes('p2')) {
+        w=64; h=64; colors=['#0000ff','#00ffff','#add8e6'];
+        pattern = ["00000010000000","00000111000000","00001121100000","00011222110000","00112202211000","01122000221100","11220000022110","12200000002210","12200000002210","11220000022110","01122000221100","00112202211000","00011222110000","00001121100000","00000111000000","00000010000000"].map(s=>s.split('').reverse().join(''));
+    } else if (type === 'charger') {
+        colors=['#ff0055']; pattern = ["10000001","11000011","11100111","01111110","00111100","00011000","00111100","01000010"];
+    } else if (type === 'shooter') {
+        colors=['#00ff55']; pattern = ["00111100","01111110","11011011","11111111","01011010","10000001","10000001","00000000"];
+    } else if (type === 'fatty') {
+        w=64; h=64; colors=['#aa00aa', '#ff00ff']; scale=4;
+        pattern = ["0000011111100000","0001122222211000","0011222222221100","0112211221122110","1122111221112211","1122222222222211","1122221111222211","1122211221122211","1122211221122211","1122221111222211","1122222222222211","1122100000012211","0112200000022110","0011222222221100","0001122222211000","0000011111100000"];
+    } else if (type === 'bullet') {
+        colors=['#ffff00']; pattern=["0010","0110","0110","0110"]; w=16; h=16;
+    } else if (type === 'enemy_bullet') {
+        colors=['#ffaa00']; pattern=["0110","1111","1111","0110"]; w=16; h=16;
+    }
+    c.width = w; c.height = h;
+    for(let r=0; r < pattern.length; r++){ for(let col=0; col < pattern[r].length; col++){ const colorIndex = parseInt(pattern[r][col]); if(colorIndex > 0){ x.fillStyle = colors[colorIndex - 1]; x.fillRect(col*scale, r*scale, scale, scale); }}}
+    return c;
+}
+
+const assets = {
+    p1: generateSprite('p1'), p2: generateSprite('p2'),
+    charger: generateSprite('charger'), shooter: generateSprite('shooter'), fatty: generateSprite('fatty'),
+    bullet: generateSprite('bullet'), enemyBullet: generateSprite('enemy_bullet')
+};
+
+// --- 3. ENTITIES ---
+const players = [ { x: 200, y: 530, w: 64, h: 64, lives: 50, cd: 0, dead: false }, { x: 600, y: 530, w: 64, h: 64, lives: 50, cd: 0, dead: false } ];
+const pBullets = [], eBullets = [], enemies = [], particles = [];
+
+// Swarm
+const SWARM = { xOffset: 0, yBase: HEIGHT * 0.15, dir: 1, dropTimer: 0, slots: [], cols: 10, rows: 4, lastLowestRow: -1 };
+for(let i=0; i < SWARM.cols * SWARM.rows; i++) SWARM.slots.push(false);
+
+// Stars
+const stars = [];
+const starLayers = [
+    { count: 150, size: 1, speed: 0.001 },
+    { count: 75,  size: 2, speed: 0.004 },
+    { count: 30,  size: 3, speed: 0.008 },
+    { count: 15,  size: 4, speed: 0.015 }
+];
+function initStars() {
+    stars.length = 0;
+    starLayers.forEach(layer => {
+        for(let i=0; i<layer.count; i++) stars.push({ x: Math.random() * WIDTH, y: Math.random() * HEIGHT, size: layer.size, speedBase: layer.speed });
+    });
+}
+initStars();
+function updateStars(dt) {
+    stars.forEach(star => { star.y += star.speedBase * dt; if(star.y > HEIGHT) { star.y = -star.size; star.x = Math.random() * WIDTH; }});
+}
+function drawStars() {
+    ctx.fillStyle = '#fff'; stars.forEach(star => ctx.fillRect(star.x, star.y, star.size, star.size));
+}
+
+// SFX
+const sfx = {
+    shoot: (pitch=800) => {
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.type = 'square'; osc.frequency.setValueAtTime(pitch, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+    },
+    explosion: () => {
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.5, audioCtx.sampleRate);
+        const data = buf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+        const noise = audioCtx.createBufferSource(); noise.buffer = buf;
+        const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+        noise.connect(gain); gain.connect(audioCtx.destination); noise.start();
+    }
+};
+
+// --- 4. GAME LOGIC ---
+
+// Simple Toast Notification
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.style.opacity = 1;
+    setTimeout(() => t.style.opacity = 0, 3000);
+}
+
+// Button Handling
+document.getElementById('customBtn').addEventListener('click', () => {
+    document.getElementById('hiddenFileInput').click();
+});
+
+document.getElementById('hiddenFileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(event){ 
+        const text = event.target.result; 
+        const lines = text.split('\n'); 
+        enemyConfig = { chargers: [], shooters: [], fatties: [] }; 
+        let currentSection = null; 
+        const emojiRegex = /(\p{Emoji_Presentation}|\p{Extended_Pictographic})/gu;
+        
+        lines.forEach(line => { 
+            const l = line.trim().toLowerCase(); 
+            if(l.includes('[chargers]')) { currentSection = 'chargers'; return; } 
+            if(l.includes('[shooters]')) { currentSection = 'shooters'; return; } 
+            if(l.includes('[fatties]')) { currentSection = 'fatties'; return; } 
+            if(currentSection) { const found = line.match(emojiRegex); if(found) enemyConfig[currentSection].push(...found); }
+        });
+        
+        let total = enemyConfig.chargers.length + enemyConfig.shooters.length + enemyConfig.fatties.length;
+        if(total > 0) showToast(`Loaded ${total} custom enemies!`);
+        else showToast("No emojis found. Using defaults.");
+        
+        // Return focus to game
+        canvas.focus();
+    }
+    reader.readAsText(file);
+    // Clear value so same file can be selected again
+    e.target.value = '';
+});
+
+
+function createExplosion(x, y, color) {
+    for(let i=0; i<15; i++) {
+        particles.push({ x: x, y: y, vx: (Math.random()-0.5)*6, vy: (Math.random()-0.5)*6, life: 1.0, color: color, size: 4+Math.random()*4 });
+    }
+}
+
+function spawnEnemy() {
+    const rand = Math.random();
+    let type = 'charger';
+    if(rand > 0.4) type = 'shooter'; if(rand > 0.9) type = 'fatty';
+    if (type === 'shooter') { let hasSlot = false; for(let i=0; i<SWARM.slots.length; i++) if(!SWARM.slots[i]) hasSlot = true; if(!hasSlot) type = 'charger'; }
+
+    const e = { type: type, x: Math.random()*(WIDTH-64), y: -70, w: (type==='fatty')?64:32, h: (type==='fatty')?64:32, hp: (type==='fatty')?3:1, flashTimer: 0, emoji: null, state: 'entering', slotIndex: -1, gridRow: 0, gridCol: 0, color: '#ff0055' };
+
+    if(type === 'shooter') {
+        e.color = '#00ff55';
+        for(let i=0; i<SWARM.slots.length; i++) {
+            if(!SWARM.slots[i]) { SWARM.slots[i] = true; e.slotIndex = i; e.gridRow = Math.floor(i / SWARM.cols); e.gridCol = i % SWARM.cols; e.x = (WIDTH/2) + ((e.gridCol - SWARM.cols/2) * 40); break; }
+        }
+    } else if (type === 'fatty') { e.color = '#aa00aa'; }
+
+    let poolKey = type + 's'; if(type === 'fatty') poolKey = 'fatties';
+    let pool = enemyConfig[poolKey]; if(pool && pool.length > 0) e.emoji = pool[Math.floor(Math.random() * pool.length)];
+    enemies.push(e);
+}
+
+function update(dt) {
+    if(showStars) updateStars(dt);
+    if(!gameStarted || gameOver) return;
+    animFrame++;
+
+    // Swarm
+    let lowestRow = -1; enemies.forEach(e => { if(e.type === 'shooter' && e.gridRow > lowestRow) lowestRow = e.gridRow; });
+    if(lowestRow < SWARM.lastLowestRow && SWARM.lastLowestRow !== -1 && lowestRow !== -1) SWARM.yBase = HEIGHT * 0.15;
+    SWARM.lastLowestRow = lowestRow;
+    SWARM.xOffset += SWARM.dir * (0.04 * dt); if(SWARM.xOffset > 100 || SWARM.xOffset < -100) SWARM.dir *= -1;
+    SWARM.dropTimer += dt;
+    if(SWARM.dropTimer > 10000) { let currentBottomY = SWARM.yBase + (lowestRow * 40); if (currentBottomY < (players[0].y - 160)) { SWARM.yBase += 40; } SWARM.dropTimer = 0; }
+
+    // Players
+    players.forEach((p, i) => {
+        if(p.dead) return;
+        if(i===0) {
+            if(keys['ArrowLeft']) p.x -= 0.4 * dt; if(keys['ArrowRight']) p.x += 0.4 * dt;
+            if((keys['ControlLeft']||keys['ShiftLeft']||keys['KeyQ']) && p.cd <= 0) { pBullets.push({x: p.x+24, y: p.y, w:8, h:16}); sfx.shoot(800); p.cd = 200; }
+        } else if(gamepadIndex !== null) {
+            const gp = navigator.getGamepads()[gamepadIndex];
+            if(gp) { if(Math.abs(gp.axes[0])>0.1) p.x += gp.axes[0]*0.4*dt; if(gp.buttons[0].pressed && p.cd <= 0) { pBullets.push({x: p.x+24, y: p.y, w:8, h:16}); sfx.shoot(800); p.cd = 200; }}
+        }
+        p.cd -= dt; if(p.x < 0) p.x = 0; if(p.x > WIDTH-p.w) p.x = WIDTH-p.w;
+    });
+
+    // Enemies
+    if(Math.random() < 0.03) spawnEnemy();
+    for(let i=enemies.length-1; i>=0; i--) {
+        let e = enemies[i];
+        if(e.type === 'charger') e.y += 0.25 * dt; 
+        else if(e.type === 'fatty') { e.y += 0.04 * dt; if(Math.random() < 0.01) { eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, big: true}); sfx.shoot(150); }}
+        else if(e.type === 'shooter') {
+            let targetY = SWARM.yBase + (e.gridRow * 40); let targetX = (WIDTH/2) + SWARM.xOffset + ((e.gridCol - SWARM.cols/2) * 40);
+            if(e.state === 'entering') { e.y += 0.2 * dt; e.x += (targetX - e.x) * 0.05; if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; }}
+            else { e.y = targetY; e.x = targetX; if(Math.random() < 0.002) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, big: false}); sfx.shoot(300); }}
+        }
+        if(e.flashTimer > 0) e.flashTimer--;
+
+        for(let bIdx=pBullets.length-1; bIdx>=0; bIdx--) {
+            let b = pBullets[bIdx];
+            if(rectIntersect(e, b)) {
+                e.hp--; pBullets.splice(bIdx, 1);
+                if(e.hp > 0) { e.flashTimer = 5; } else { if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; createExplosion(e.x+e.w/2, e.y+e.h/2, e.color); sfx.explosion(); enemies.splice(i, 1); }
+                break;
+            }
+        }
+        if(e.y > HEIGHT) { if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; enemies.splice(i, 1); }
+    }
+
+    // Particles
+    for(let i=particles.length-1; i>=0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05; if(p.life <= 0) particles.splice(i, 1); }
+    updateBullets(pBullets, -0.6, dt); updateBullets(eBullets, 0.4, dt);
+    eBullets.forEach((b, bIdx) => { players.forEach(p => { if(!p.dead && rectIntersect(p, b)) { p.lives--; eBullets.splice(bIdx, 1); sfx.explosion(); createExplosion(p.x+32, p.y+32, '#fff'); if(p.lives <= 0) p.dead = true; }}); });
+    if(players[0].dead && players[1].dead) gameOver = true;
+}
+function updateBullets(arr, spd, dt) { for(let i=arr.length-1; i>=0; i--) { arr[i].y += spd * dt; if(arr[i].y < -20 || arr[i].y > HEIGHT+20) arr.splice(i, 1); }}
+
+function draw() {
+    ctx.fillStyle = '#111'; ctx.fillRect(0,0,WIDTH,HEIGHT);
+    if(showStars) drawStars();
+    if(!gameStarted && !gameOver) { ctx.fillStyle = "#0f0"; ctx.font = "30px Courier New"; ctx.textAlign = "center"; ctx.fillText("READY: PRESS ARROW KEY", WIDTH/2, HEIGHT/2); return; }
+    if(gameOver) { ctx.fillStyle = "red"; ctx.font = "50px Courier New"; ctx.textAlign = "center"; ctx.fillText("GAME OVER", WIDTH/2, HEIGHT/2); return; }
+
+    particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1.0; });
+    players.forEach((p, i) => { if(!p.dead) ctx.drawImage(assets['p'+(i+1)], p.x, p.y, p.w, p.h); });
+    enemies.forEach(e => {
+        if(e.flashTimer > 0) { ctx.save(); ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = "white"; ctx.fillRect(e.x, e.y, e.w, e.h); ctx.restore(); }
+        else {
+            if(e.emoji) { ctx.font = (e.type==='fatty'?"50px":"28px")+" Arial"; ctx.textAlign="center"; ctx.fillText(e.emoji, e.x+e.w/2, e.y+e.h/1.2); }
+            else { ctx.drawImage(assets[e.type], e.x, e.y, e.w, e.h); }
+        }
+    });
+
+    ctx.fillStyle = "#ff0"; pBullets.forEach(b => ctx.drawImage(assets.bullet, b.x, b.y, b.w, b.h));
+    eBullets.forEach(b => { if(b.big) ctx.drawImage(assets.enemyBullet, b.x, b.y, b.w, b.h); else ctx.drawImage(assets.enemyBullet, b.x, b.y, b.w, b.h); });
+    ctx.font = "20px Courier New"; ctx.textAlign = "left"; ctx.fillStyle = "#0f0"; ctx.fillText(`P1: ${players[0].lives}`, 20, 30); ctx.fillStyle = "#5050ff"; ctx.fillText(`P2: ${players[1].lives}`, WIDTH-160, 30);
+}
+function rectIntersect(r1, r2) { return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y); }
+
+// LISTENERS
+window.addEventListener('keydown', e => { keys[e.code] = true; if((e.code==='ArrowLeft'||e.code==='ArrowRight') && !gameStarted) { gameStarted=true; audioCtx.resume(); } if(e.code === 'KeyB') showStars = !showStars; });
+window.addEventListener('keyup', e => keys[e.code] = false);
+window.addEventListener("gamepadconnected", e => gamepadIndex = e.gamepad.index);
+function loop(t) { let dt = t - lastTime; if(dt>100) dt=100; lastTime = t; update(dt); draw(); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
