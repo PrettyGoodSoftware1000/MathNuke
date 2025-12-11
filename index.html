@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GALAGO: Customizable</title>
+    <title>GALAGO: Rate Control</title>
     <style>
         body {
             background-color: #1a1a2e;
@@ -102,17 +102,18 @@ let gameStarted = false;
 let gameOver = false;
 let animFrame = 0;
 let showStars = false;
+let spawnTimer = 0; // New timer for SPM logic
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const keys = {};
 let gamepadIndex = null;
 
-// --- CONFIGURATION OBJECT ---
-// Now stores data objects instead of just arrays
+// Default Config
 let enemyConfig = {
-    chargers: { emojis: [], speed: 1.0, weight: 40 }, // Default weight ~40%
-    shooters: { emojis: [], speed: 1.0, weight: 50 }, // Default weight ~50%
-    fatties:  { emojis: [], speed: 1.0, weight: 10 }  // Default weight ~10%
+    shipsPerMin: 100, // Default spawn rate
+    chargers: { emojis: [], speed: 1.0, weight: 40 }, 
+    shooters: { emojis: [], speed: 1.0, weight: 50 }, 
+    fatties:  { emojis: [], speed: 1.0, weight: 10 }  
 };
 
 // --- 2. ASSETS ---
@@ -153,11 +154,9 @@ const assets = {
 const players = [ { x: 200, y: 530, w: 64, h: 64, lives: 50, cd: 0, dead: false }, { x: 600, y: 530, w: 64, h: 64, lives: 50, cd: 0, dead: false } ];
 const pBullets = [], eBullets = [], enemies = [], particles = [];
 
-// Swarm
 const SWARM = { xOffset: 0, yBase: HEIGHT * 0.15, dir: 1, dropTimer: 0, slots: [], cols: 10, rows: 4, lastLowestRow: -1 };
 for(let i=0; i < SWARM.cols * SWARM.rows; i++) SWARM.slots.push(false);
 
-// Stars
 const stars = [];
 const starLayers = [
     { count: 150, size: 1, speed: 0.001 },
@@ -179,7 +178,6 @@ function drawStars() {
     ctx.fillStyle = '#fff'; stars.forEach(star => ctx.fillRect(star.x, star.y, star.size, star.size));
 }
 
-// SFX
 const sfx = {
     shoot: (pitch=800) => {
         if(audioCtx.state === 'suspended') audioCtx.resume();
@@ -198,13 +196,14 @@ const sfx = {
     }
 };
 
-// --- 4. PARSER & LOADING LOGIC ---
+// --- 4. PARSER ---
 
 function parseEnemyText(text) {
     if(!text || text.trim() === "") return;
     
     // Reset configs
     const newConfig = {
+        shipsPerMin: 100, // Reset to default
         chargers: { emojis: [], speed: 1.0, weight: 40 },
         shooters: { emojis: [], speed: 1.0, weight: 50 },
         fatties:  { emojis: [], speed: 1.0, weight: 10 }
@@ -214,31 +213,35 @@ function parseEnemyText(text) {
     let currentSection = null;
     const emojiRegex = /(\p{Emoji_Presentation}|\p{Extended_Pictographic})/gu;
     const speedRegex = /<speed\s*([\d.]+)%>/i;
-    const commonnessRegex = /<commonness\s*([\d.]+)%>/i;
+    const commRegex = /<commonness\s*([\d.]+)%>/i;
+    const spmRegex = /\[ShipsPerMin\s+(\d+)\]/i;
     
     lines.forEach(line => {
         const l = line.trim().toLowerCase();
         
-        // Check for Headers and Stats
+        // Global Settings Check
+        const spmMatch = line.match(spmRegex);
+        if (spmMatch) {
+            let val = parseInt(spmMatch[1]);
+            if (val < 1) val = 1;
+            if (val > 9999) val = 9999;
+            newConfig.shipsPerMin = val;
+        }
+
+        // Section Headers
         if(l.includes('[chargers]')) { currentSection = 'chargers'; }
         else if(l.includes('[shooters]')) { currentSection = 'shooters'; }
         else if(l.includes('[fatties]')) { currentSection = 'fatties'; }
         
         if (currentSection) {
-            // Check for stats on the same line or subsequent lines
+            // Stats
             const speedMatch = line.match(speedRegex);
-            const commMatch = line.match(commonnessRegex);
+            const commMatch = line.match(commRegex);
             
-            if (speedMatch) {
-                // Convert percentage to multiplier (50% -> 0.5)
-                newConfig[currentSection].speed = parseFloat(speedMatch[1]) / 100;
-            }
-            if (commMatch) {
-                // Use the raw percentage number as weight (e.g. 0.1)
-                newConfig[currentSection].weight = parseFloat(commMatch[1]);
-            }
+            if (speedMatch) newConfig[currentSection].speed = parseFloat(speedMatch[1]) / 100;
+            if (commMatch) newConfig[currentSection].weight = parseFloat(commMatch[1]);
 
-            // Find Emojis
+            // Emojis
             const found = line.match(emojiRegex);
             if(found) newConfig[currentSection].emojis.push(...found);
         }
@@ -246,13 +249,10 @@ function parseEnemyText(text) {
 
     let total = newConfig.chargers.emojis.length + newConfig.shooters.emojis.length + newConfig.fatties.emojis.length;
     
-    if(total > 0) {
-        enemyConfig = newConfig;
-        showToast(`Loaded Config! (Found ${total} emojis)`);
-        console.log("New Config:", enemyConfig);
-    } else {
-        if (arguments[1] === true) showToast("File empty/invalid."); 
-    }
+    // Accept config if either emojis exist OR we set SPM
+    enemyConfig = newConfig;
+    showToast(`Config Loaded! (${newConfig.shipsPerMin} ships/min)`);
+    console.log("New Config:", enemyConfig);
 }
 
 // Auto-Load
@@ -296,28 +296,15 @@ function createExplosion(x, y, color) {
 }
 
 function spawnEnemy() {
-    // Weighted Random Selection
-    const weights = {
-        charger: enemyConfig.chargers.weight,
-        shooter: enemyConfig.shooters.weight,
-        fatty:   enemyConfig.fatties.weight
-    };
-    
-    // Normalize weights if needed, or just sum them up
+    const weights = { charger: enemyConfig.chargers.weight, shooter: enemyConfig.shooters.weight, fatty: enemyConfig.fatties.weight };
     const totalWeight = weights.charger + weights.shooter + weights.fatty;
     let randomNum = Math.random() * totalWeight;
     
     let type = 'charger';
-    
-    if (randomNum < weights.charger) {
-        type = 'charger';
-    } else if (randomNum < weights.charger + weights.shooter) {
-        type = 'shooter';
-    } else {
-        type = 'fatty';
-    }
+    if (randomNum < weights.charger) type = 'charger';
+    else if (randomNum < weights.charger + weights.shooter) type = 'shooter';
+    else type = 'fatty';
 
-    // Logic: Limit shooters if swarm full (fallback to charger)
     if (type === 'shooter') {
         let hasSlot = false;
         for(let i=0; i<SWARM.slots.length; i++) if(!SWARM.slots[i]) hasSlot = true;
@@ -325,37 +312,23 @@ function spawnEnemy() {
     }
 
     const e = { 
-        type: type, 
-        x: Math.random()*(WIDTH-64), 
-        y: -70, 
-        w: (type==='fatty')?64:32, 
-        h: (type==='fatty')?64:32, 
-        hp: (type==='fatty')?3:1, 
-        flashTimer: 0, 
-        emoji: null, 
-        state: 'entering', 
-        slotIndex: -1, 
-        gridRow: 0, gridCol: 0, 
-        color: '#ff0055',
-        speedMult: 1.0 // Default
+        type: type, x: Math.random()*(WIDTH-64), y: -70, 
+        w: (type==='fatty')?64:32, h: (type==='fatty')?64:32, hp: (type==='fatty')?3:1, 
+        flashTimer: 0, emoji: null, state: 'entering', slotIndex: -1, gridRow: 0, gridCol: 0, 
+        color: '#ff0055', speedMult: 1.0 
     };
 
-    // Apply Specifics
     if (type === 'charger') {
-        e.color = '#ff0055';
-        e.speedMult = enemyConfig.chargers.speed;
+        e.color = '#ff0055'; e.speedMult = enemyConfig.chargers.speed;
     } else if(type === 'shooter') {
-        e.color = '#00ff55';
-        e.speedMult = enemyConfig.shooters.speed;
+        e.color = '#00ff55'; e.speedMult = enemyConfig.shooters.speed;
         for(let i=0; i<SWARM.slots.length; i++) {
             if(!SWARM.slots[i]) { SWARM.slots[i] = true; e.slotIndex = i; e.gridRow = Math.floor(i / SWARM.cols); e.gridCol = i % SWARM.cols; e.x = (WIDTH/2) + ((e.gridCol - SWARM.cols/2) * 40); break; }
         }
     } else if (type === 'fatty') {
-        e.color = '#aa00aa';
-        e.speedMult = enemyConfig.fatties.speed;
+        e.color = '#aa00aa'; e.speedMult = enemyConfig.fatties.speed;
     }
 
-    // Assign Emoji
     let poolKey = type + 's'; if(type === 'fatty') poolKey = 'fatties';
     let pool = enemyConfig[poolKey].emojis;
     if(pool && pool.length > 0) e.emoji = pool[Math.floor(Math.random() * pool.length)];
@@ -389,15 +362,18 @@ function update(dt) {
         p.cd -= dt; if(p.x < 0) p.x = 0; if(p.x > WIDTH-p.w) p.x = WIDTH-p.w;
     });
 
-    // Enemies
-    if(Math.random() < 0.03) spawnEnemy();
+    // Enemies (Rate Controlled)
+    spawnTimer += dt;
+    const interval = 60000 / enemyConfig.shipsPerMin;
+    if (spawnTimer > interval) {
+        spawnEnemy();
+        spawnTimer = 0;
+    }
+
     for(let i=enemies.length-1; i>=0; i--) {
         let e = enemies[i];
         
-        // MOVEMENT WITH SPEED MULTIPLIER
-        if(e.type === 'charger') {
-            e.y += 0.25 * e.speedMult * dt; 
-        } 
+        if(e.type === 'charger') { e.y += 0.25 * e.speedMult * dt; } 
         else if(e.type === 'fatty') { 
             e.y += 0.04 * e.speedMult * dt; 
             if(Math.random() < 0.01) { eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, big: true}); sfx.shoot(150); }
@@ -405,8 +381,7 @@ function update(dt) {
         else if(e.type === 'shooter') {
             let targetY = SWARM.yBase + (e.gridRow * 40); let targetX = (WIDTH/2) + SWARM.xOffset + ((e.gridCol - SWARM.cols/2) * 40);
             if(e.state === 'entering') { 
-                e.y += 0.2 * e.speedMult * dt; // Apply speed to entry
-                e.x += (targetX - e.x) * 0.05; 
+                e.y += 0.2 * e.speedMult * dt; e.x += (targetX - e.x) * 0.05; 
                 if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; }
             }
             else { 
