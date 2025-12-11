@@ -1,0 +1,9 @@
+[Chargers] <speed 150%> <Commonness 5%>
+👽
+
+[Shooters] <speed 80%> <Commonness 90%>
+👾
+
+
+[Fatties] <speed 50%> <Commonness 5%>
+👹
