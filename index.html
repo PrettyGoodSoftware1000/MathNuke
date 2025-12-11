@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GALAGO: Direct Load</title>
+    <title>GALAGO: GitHub Edition</title>
     <style>
         body {
             background-color: #1a1a2e;
@@ -56,7 +56,7 @@
             border-color: #606080;
         }
         
-        /* Notification toast for file load */
+        /* Notification toast */
         #toast {
             position: fixed;
             bottom: 20px;
@@ -70,6 +70,7 @@
             opacity: 0;
             transition: opacity 0.5s;
             pointer-events: none;
+            z-index: 2000;
         }
     </style>
 </head>
@@ -89,7 +90,7 @@
 
     <input type="file" id="hiddenFileInput" style="display: none;" accept=".txt">
     
-    <button id="customBtn">Custom (Load enemies.txt)</button>
+    <button id="customBtn">Custom Config</button>
     
     <div id="toast">Config Loaded!</div>
 
@@ -106,15 +107,12 @@ let gameOver = false;
 let animFrame = 0;
 let showStars = false;
 
-// Audio
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-// Inputs
 const keys = {};
 let gamepadIndex = null;
 let enemyConfig = { chargers: [], shooters: [], fatties: [] };
 
-// --- 2. ASSETS ---
+// --- 2. ASSET GENERATION (Fallback & Default) ---
 function generateSprite(type) {
     const c = document.createElement('canvas'); const x = c.getContext('2d');
     let scale = 4, w=32, h=32, colors=[], pattern=[];
@@ -148,7 +146,7 @@ const assets = {
     bullet: generateSprite('bullet'), enemyBullet: generateSprite('enemy_bullet')
 };
 
-// --- 3. ENTITIES ---
+// --- 3. ENTITIES & SYSTEMS ---
 const players = [ { x: 200, y: 530, w: 64, h: 64, lives: 50, cd: 0, dead: false }, { x: 600, y: 530, w: 64, h: 64, lives: 50, cd: 0, dead: false } ];
 const pBullets = [], eBullets = [], enemies = [], particles = [];
 
@@ -156,7 +154,7 @@ const pBullets = [], eBullets = [], enemies = [], particles = [];
 const SWARM = { xOffset: 0, yBase: HEIGHT * 0.15, dir: 1, dropTimer: 0, slots: [], cols: 10, rows: 4, lastLowestRow: -1 };
 for(let i=0; i < SWARM.cols * SWARM.rows; i++) SWARM.slots.push(false);
 
-// Stars
+// Stars (Ultra Slow)
 const stars = [];
 const starLayers = [
     { count: 150, size: 1, speed: 0.001 },
@@ -197,52 +195,84 @@ const sfx = {
     }
 };
 
-// --- 4. GAME LOGIC ---
+// --- 4. CONFIG & LOADING LOGIC ---
 
-// Simple Toast Notification
+function parseEnemyText(text) {
+    if(!text || text.trim() === "") return;
+    const newConfig = { chargers: [], shooters: [], fatties: [] };
+    const lines = text.split('\n');
+    let currentSection = null;
+    const emojiRegex = /(\p{Emoji_Presentation}|\p{Extended_Pictographic})/gu;
+    
+    lines.forEach(line => {
+        const l = line.trim().toLowerCase();
+        if(l.includes('[chargers]')) { currentSection = 'chargers'; return; }
+        if(l.includes('[shooters]')) { currentSection = 'shooters'; return; }
+        if(l.includes('[fatties]')) { currentSection = 'fatties'; return; }
+        
+        if(currentSection) {
+            const found = line.match(emojiRegex);
+            if(found) newConfig[currentSection].push(...found);
+        }
+    });
+
+    let total = newConfig.chargers.length + newConfig.shooters.length + newConfig.fatties.length;
+    if(total > 0) {
+        enemyConfig = newConfig;
+        showToast(`Auto-Loaded ${total} Enemies!`);
+    } else {
+        // Only show error toast if this was a manual upload attempt
+        // We stay silent on auto-load failure to keep it clean
+        if (arguments[1] === true) showToast("File empty/invalid."); 
+    }
+}
+
+// Auto-Load on Startup (GitHub / Server)
+window.addEventListener('load', () => {
+    // 1. Try Config
+    fetch('enemies.txt')
+        .then(res => { if(!res.ok) throw new Error("No config"); return res.text(); })
+        .then(text => parseEnemyText(text))
+        .catch(e => console.log("No default enemies.txt found."));
+
+    // 2. Try Images
+    const imgs = ['p1.png', 'p2.png', 'enemy.png'];
+    imgs.forEach(name => {
+        const i = new Image();
+        i.src = name;
+        i.onload = () => {
+            if(name.includes('p1')) assets.p1 = i;
+            if(name.includes('p2')) assets.p2 = i;
+            // enemy.png fallback for chargers/shooters if no emoji
+            if(name.includes('enemy')) { assets.charger=i; assets.shooter=i; }
+        };
+    });
+});
+
+// Toast
 function showToast(msg) {
     const t = document.getElementById('toast');
-    t.innerText = msg;
-    t.style.opacity = 1;
+    t.innerText = msg; t.style.opacity = 1;
     setTimeout(() => t.style.opacity = 0, 3000);
 }
 
-// Button Handling
+// Manual Button Handlers
 document.getElementById('customBtn').addEventListener('click', () => {
     document.getElementById('hiddenFileInput').click();
 });
 
 document.getElementById('hiddenFileInput').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if(!file) return;
+    const file = e.target.files[0]; if(!file) return;
     const reader = new FileReader();
     reader.onload = function(event){ 
-        const text = event.target.result; 
-        const lines = text.split('\n'); 
-        enemyConfig = { chargers: [], shooters: [], fatties: [] }; 
-        let currentSection = null; 
-        const emojiRegex = /(\p{Emoji_Presentation}|\p{Extended_Pictographic})/gu;
-        
-        lines.forEach(line => { 
-            const l = line.trim().toLowerCase(); 
-            if(l.includes('[chargers]')) { currentSection = 'chargers'; return; } 
-            if(l.includes('[shooters]')) { currentSection = 'shooters'; return; } 
-            if(l.includes('[fatties]')) { currentSection = 'fatties'; return; } 
-            if(currentSection) { const found = line.match(emojiRegex); if(found) enemyConfig[currentSection].push(...found); }
-        });
-        
-        let total = enemyConfig.chargers.length + enemyConfig.shooters.length + enemyConfig.fatties.length;
-        if(total > 0) showToast(`Loaded ${total} custom enemies!`);
-        else showToast("No emojis found. Using defaults.");
-        
-        // Return focus to game
+        parseEnemyText(event.target.result, true); // true = manual flag
         canvas.focus();
     }
     reader.readAsText(file);
-    // Clear value so same file can be selected again
     e.target.value = '';
 });
 
+// --- 5. GAME LOOP LOGIC ---
 
 function createExplosion(x, y, color) {
     for(let i=0; i<15; i++) {
@@ -350,7 +380,6 @@ function draw() {
 }
 function rectIntersect(r1, r2) { return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y); }
 
-// LISTENERS
 window.addEventListener('keydown', e => { keys[e.code] = true; if((e.code==='ArrowLeft'||e.code==='ArrowRight') && !gameStarted) { gameStarted=true; audioCtx.resume(); } if(e.code === 'KeyB') showStars = !showStars; });
 window.addEventListener('keyup', e => keys[e.code] = false);
 window.addEventListener("gamepadconnected", e => gamepadIndex = e.gamepad.index);
