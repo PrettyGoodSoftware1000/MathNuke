@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GALAGO: GitHub Edition</title>
+    <title>GALAGO: Customizable</title>
     <style>
         body {
             background-color: #1a1a2e;
@@ -34,7 +34,6 @@
             font-size: 0.8em; text-align: center; width: 800px;
         }
 
-        /* The Custom Button */
         #customBtn {
             position: fixed;
             bottom: 15px;
@@ -56,7 +55,6 @@
             border-color: #606080;
         }
         
-        /* Notification toast */
         #toast {
             position: fixed;
             bottom: 20px;
@@ -89,9 +87,7 @@
     </div>
 
     <input type="file" id="hiddenFileInput" style="display: none;" accept=".txt">
-    
     <button id="customBtn">Custom Config</button>
-    
     <div id="toast">Config Loaded!</div>
 
 <script>
@@ -110,9 +106,16 @@ let showStars = false;
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const keys = {};
 let gamepadIndex = null;
-let enemyConfig = { chargers: [], shooters: [], fatties: [] };
 
-// --- 2. ASSET GENERATION (Fallback & Default) ---
+// --- CONFIGURATION OBJECT ---
+// Now stores data objects instead of just arrays
+let enemyConfig = {
+    chargers: { emojis: [], speed: 1.0, weight: 40 }, // Default weight ~40%
+    shooters: { emojis: [], speed: 1.0, weight: 50 }, // Default weight ~50%
+    fatties:  { emojis: [], speed: 1.0, weight: 10 }  // Default weight ~10%
+};
+
+// --- 2. ASSETS ---
 function generateSprite(type) {
     const c = document.createElement('canvas'); const x = c.getContext('2d');
     let scale = 4, w=32, h=32, colors=[], pattern=[];
@@ -154,7 +157,7 @@ const pBullets = [], eBullets = [], enemies = [], particles = [];
 const SWARM = { xOffset: 0, yBase: HEIGHT * 0.15, dir: 1, dropTimer: 0, slots: [], cols: 10, rows: 4, lastLowestRow: -1 };
 for(let i=0; i < SWARM.cols * SWARM.rows; i++) SWARM.slots.push(false);
 
-// Stars (Ultra Slow)
+// Stars
 const stars = [];
 const starLayers = [
     { count: 150, size: 1, speed: 0.001 },
@@ -195,84 +198,96 @@ const sfx = {
     }
 };
 
-// --- 4. CONFIG & LOADING LOGIC ---
+// --- 4. PARSER & LOADING LOGIC ---
 
 function parseEnemyText(text) {
     if(!text || text.trim() === "") return;
-    const newConfig = { chargers: [], shooters: [], fatties: [] };
+    
+    // Reset configs
+    const newConfig = {
+        chargers: { emojis: [], speed: 1.0, weight: 40 },
+        shooters: { emojis: [], speed: 1.0, weight: 50 },
+        fatties:  { emojis: [], speed: 1.0, weight: 10 }
+    };
+    
     const lines = text.split('\n');
     let currentSection = null;
     const emojiRegex = /(\p{Emoji_Presentation}|\p{Extended_Pictographic})/gu;
+    const speedRegex = /<speed\s*([\d.]+)%>/i;
+    const commonnessRegex = /<commonness\s*([\d.]+)%>/i;
     
     lines.forEach(line => {
         const l = line.trim().toLowerCase();
-        if(l.includes('[chargers]')) { currentSection = 'chargers'; return; }
-        if(l.includes('[shooters]')) { currentSection = 'shooters'; return; }
-        if(l.includes('[fatties]')) { currentSection = 'fatties'; return; }
         
-        if(currentSection) {
+        // Check for Headers and Stats
+        if(l.includes('[chargers]')) { currentSection = 'chargers'; }
+        else if(l.includes('[shooters]')) { currentSection = 'shooters'; }
+        else if(l.includes('[fatties]')) { currentSection = 'fatties'; }
+        
+        if (currentSection) {
+            // Check for stats on the same line or subsequent lines
+            const speedMatch = line.match(speedRegex);
+            const commMatch = line.match(commonnessRegex);
+            
+            if (speedMatch) {
+                // Convert percentage to multiplier (50% -> 0.5)
+                newConfig[currentSection].speed = parseFloat(speedMatch[1]) / 100;
+            }
+            if (commMatch) {
+                // Use the raw percentage number as weight (e.g. 0.1)
+                newConfig[currentSection].weight = parseFloat(commMatch[1]);
+            }
+
+            // Find Emojis
             const found = line.match(emojiRegex);
-            if(found) newConfig[currentSection].push(...found);
+            if(found) newConfig[currentSection].emojis.push(...found);
         }
     });
 
-    let total = newConfig.chargers.length + newConfig.shooters.length + newConfig.fatties.length;
+    let total = newConfig.chargers.emojis.length + newConfig.shooters.emojis.length + newConfig.fatties.emojis.length;
+    
     if(total > 0) {
         enemyConfig = newConfig;
-        showToast(`Auto-Loaded ${total} Enemies!`);
+        showToast(`Loaded Config! (Found ${total} emojis)`);
+        console.log("New Config:", enemyConfig);
     } else {
-        // Only show error toast if this was a manual upload attempt
-        // We stay silent on auto-load failure to keep it clean
         if (arguments[1] === true) showToast("File empty/invalid."); 
     }
 }
 
-// Auto-Load on Startup (GitHub / Server)
+// Auto-Load
 window.addEventListener('load', () => {
-    // 1. Try Config
     fetch('enemies.txt')
         .then(res => { if(!res.ok) throw new Error("No config"); return res.text(); })
         .then(text => parseEnemyText(text))
         .catch(e => console.log("No default enemies.txt found."));
 
-    // 2. Try Images
     const imgs = ['p1.png', 'p2.png', 'enemy.png'];
     imgs.forEach(name => {
-        const i = new Image();
-        i.src = name;
+        const i = new Image(); i.src = name;
         i.onload = () => {
             if(name.includes('p1')) assets.p1 = i;
             if(name.includes('p2')) assets.p2 = i;
-            // enemy.png fallback for chargers/shooters if no emoji
             if(name.includes('enemy')) { assets.charger=i; assets.shooter=i; }
         };
     });
 });
 
-// Toast
 function showToast(msg) {
     const t = document.getElementById('toast');
     t.innerText = msg; t.style.opacity = 1;
     setTimeout(() => t.style.opacity = 0, 3000);
 }
 
-// Manual Button Handlers
-document.getElementById('customBtn').addEventListener('click', () => {
-    document.getElementById('hiddenFileInput').click();
-});
-
+document.getElementById('customBtn').addEventListener('click', () => { document.getElementById('hiddenFileInput').click(); });
 document.getElementById('hiddenFileInput').addEventListener('change', (e) => {
     const file = e.target.files[0]; if(!file) return;
     const reader = new FileReader();
-    reader.onload = function(event){ 
-        parseEnemyText(event.target.result, true); // true = manual flag
-        canvas.focus();
-    }
-    reader.readAsText(file);
-    e.target.value = '';
+    reader.onload = function(event){ parseEnemyText(event.target.result, true); canvas.focus(); }
+    reader.readAsText(file); e.target.value = '';
 });
 
-// --- 5. GAME LOOP LOGIC ---
+// --- 5. GAME LOGIC ---
 
 function createExplosion(x, y, color) {
     for(let i=0; i<15; i++) {
@@ -281,22 +296,70 @@ function createExplosion(x, y, color) {
 }
 
 function spawnEnemy() {
-    const rand = Math.random();
+    // Weighted Random Selection
+    const weights = {
+        charger: enemyConfig.chargers.weight,
+        shooter: enemyConfig.shooters.weight,
+        fatty:   enemyConfig.fatties.weight
+    };
+    
+    // Normalize weights if needed, or just sum them up
+    const totalWeight = weights.charger + weights.shooter + weights.fatty;
+    let randomNum = Math.random() * totalWeight;
+    
     let type = 'charger';
-    if(rand > 0.4) type = 'shooter'; if(rand > 0.9) type = 'fatty';
-    if (type === 'shooter') { let hasSlot = false; for(let i=0; i<SWARM.slots.length; i++) if(!SWARM.slots[i]) hasSlot = true; if(!hasSlot) type = 'charger'; }
+    
+    if (randomNum < weights.charger) {
+        type = 'charger';
+    } else if (randomNum < weights.charger + weights.shooter) {
+        type = 'shooter';
+    } else {
+        type = 'fatty';
+    }
 
-    const e = { type: type, x: Math.random()*(WIDTH-64), y: -70, w: (type==='fatty')?64:32, h: (type==='fatty')?64:32, hp: (type==='fatty')?3:1, flashTimer: 0, emoji: null, state: 'entering', slotIndex: -1, gridRow: 0, gridCol: 0, color: '#ff0055' };
+    // Logic: Limit shooters if swarm full (fallback to charger)
+    if (type === 'shooter') {
+        let hasSlot = false;
+        for(let i=0; i<SWARM.slots.length; i++) if(!SWARM.slots[i]) hasSlot = true;
+        if(!hasSlot) type = 'charger';
+    }
 
-    if(type === 'shooter') {
+    const e = { 
+        type: type, 
+        x: Math.random()*(WIDTH-64), 
+        y: -70, 
+        w: (type==='fatty')?64:32, 
+        h: (type==='fatty')?64:32, 
+        hp: (type==='fatty')?3:1, 
+        flashTimer: 0, 
+        emoji: null, 
+        state: 'entering', 
+        slotIndex: -1, 
+        gridRow: 0, gridCol: 0, 
+        color: '#ff0055',
+        speedMult: 1.0 // Default
+    };
+
+    // Apply Specifics
+    if (type === 'charger') {
+        e.color = '#ff0055';
+        e.speedMult = enemyConfig.chargers.speed;
+    } else if(type === 'shooter') {
         e.color = '#00ff55';
+        e.speedMult = enemyConfig.shooters.speed;
         for(let i=0; i<SWARM.slots.length; i++) {
             if(!SWARM.slots[i]) { SWARM.slots[i] = true; e.slotIndex = i; e.gridRow = Math.floor(i / SWARM.cols); e.gridCol = i % SWARM.cols; e.x = (WIDTH/2) + ((e.gridCol - SWARM.cols/2) * 40); break; }
         }
-    } else if (type === 'fatty') { e.color = '#aa00aa'; }
+    } else if (type === 'fatty') {
+        e.color = '#aa00aa';
+        e.speedMult = enemyConfig.fatties.speed;
+    }
 
+    // Assign Emoji
     let poolKey = type + 's'; if(type === 'fatty') poolKey = 'fatties';
-    let pool = enemyConfig[poolKey]; if(pool && pool.length > 0) e.emoji = pool[Math.floor(Math.random() * pool.length)];
+    let pool = enemyConfig[poolKey].emojis;
+    if(pool && pool.length > 0) e.emoji = pool[Math.floor(Math.random() * pool.length)];
+    
     enemies.push(e);
 }
 
@@ -330,12 +393,26 @@ function update(dt) {
     if(Math.random() < 0.03) spawnEnemy();
     for(let i=enemies.length-1; i>=0; i--) {
         let e = enemies[i];
-        if(e.type === 'charger') e.y += 0.25 * dt; 
-        else if(e.type === 'fatty') { e.y += 0.04 * dt; if(Math.random() < 0.01) { eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, big: true}); sfx.shoot(150); }}
+        
+        // MOVEMENT WITH SPEED MULTIPLIER
+        if(e.type === 'charger') {
+            e.y += 0.25 * e.speedMult * dt; 
+        } 
+        else if(e.type === 'fatty') { 
+            e.y += 0.04 * e.speedMult * dt; 
+            if(Math.random() < 0.01) { eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, big: true}); sfx.shoot(150); }
+        }
         else if(e.type === 'shooter') {
             let targetY = SWARM.yBase + (e.gridRow * 40); let targetX = (WIDTH/2) + SWARM.xOffset + ((e.gridCol - SWARM.cols/2) * 40);
-            if(e.state === 'entering') { e.y += 0.2 * dt; e.x += (targetX - e.x) * 0.05; if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; }}
-            else { e.y = targetY; e.x = targetX; if(Math.random() < 0.002) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, big: false}); sfx.shoot(300); }}
+            if(e.state === 'entering') { 
+                e.y += 0.2 * e.speedMult * dt; // Apply speed to entry
+                e.x += (targetX - e.x) * 0.05; 
+                if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; }
+            }
+            else { 
+                e.y = targetY; e.x = targetX; 
+                if(Math.random() < 0.002) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, big: false}); sfx.shoot(300); }
+            }
         }
         if(e.flashTimer > 0) e.flashTimer--;
 
