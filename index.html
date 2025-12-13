@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GALAGO: Rate Control</title>
+    <title>GALAGO: Smooth Steering</title>
     <style>
         body {
             background-color: #1a1a2e;
@@ -12,11 +12,21 @@
             flex-direction: column;
             align-items: center;
             margin: 0;
-            padding: 20px;
+            padding: 10px;
             overflow: hidden;
         }
-        h1 { margin-bottom: 10px; text-shadow: 2px 2px #ff0055; font-size: 48px; }
         
+        #hud {
+            width: 800px;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #0f0; 
+            font-size: 18px;
+            line-height: 1.4em;
+        }
+
         #gameContainer {
             position: relative;
             border: 4px solid #444;
@@ -31,50 +41,33 @@
 
         .controls-info {
             background: #333; padding: 10px; margin-top: 10px;
-            font-size: 0.8em; text-align: center; width: 800px;
+            font-size: 0.8em; text-align: center; width: 800px; color: #fff;
         }
 
         #customBtn {
-            position: fixed;
-            bottom: 15px;
-            left: 15px;
-            background-color: #252540;
-            color: #707090;
-            border: 1px solid #303050;
-            padding: 10px 16px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            cursor: pointer;
-            border-radius: 4px;
-            transition: all 0.2s;
-            z-index: 1000;
+            position: fixed; bottom: 15px; left: 15px;
+            background-color: #252540; color: #707090;
+            border: 1px solid #303050; padding: 10px 16px;
+            font-family: 'Courier New', monospace; font-size: 14px;
+            cursor: pointer; border-radius: 4px; transition: all 0.2s; z-index: 1000;
         }
-        #customBtn:hover {
-            background-color: #353555;
-            color: #fff;
-            border-color: #606080;
-        }
+        #customBtn:hover { background-color: #353555; color: #fff; border-color: #606080; }
         
         #toast {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #222;
-            color: #0f0;
-            padding: 10px 20px;
-            border-radius: 20px;
-            border: 1px solid #444;
-            opacity: 0;
-            transition: opacity 0.5s;
-            pointer-events: none;
-            z-index: 2000;
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #222; color: #0f0; padding: 10px 20px;
+            border-radius: 20px; border: 1px solid #444; opacity: 0;
+            transition: opacity 0.5s; pointer-events: none; z-index: 2000;
         }
     </style>
 </head>
 <body>
 
-    <h1>GALAGO</h1>
+    <div id="hud">
+        <div id="p1Stats">Space Bucks: $0.00<br>Lives: 25</div>
+        <div id="gameTitle" style="color:#ff0055; font-size: 24px;">GALAGO</div>
+        <div id="p2Stats" style="text-align: right;">Space Bucks: $0.00<br>Lives: 25</div>
+    </div>
 
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="600" tabindex="1"></canvas>
@@ -82,8 +75,7 @@
 
     <div class="controls-info">
         <strong>P1:</strong> Arrows Move, CTRL/SHIFT Shoot <br>
-        <strong>P2:</strong> Stick Move, 'A' Shoot <br>
-        <strong>System:</strong> Press 'B' to toggle Stars
+        <strong>P2:</strong> Stick Move, 'A' Shoot
     </div>
 
     <input type="file" id="hiddenFileInput" style="display: none;" accept=".txt">
@@ -102,21 +94,75 @@ let gameStarted = false;
 let gameOver = false;
 let animFrame = 0;
 let showStars = false;
-let spawnTimer = 0; // New timer for SPM logic
+
+// ECONOMY
+let p1Cash = 0.00;
+let p2Cash = 0.00;
+let highCash = parseFloat(localStorage.getItem('galago_high_cash')) || 0.00;
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const keys = {};
 let gamepadIndex = null;
 
-// Default Config
-let enemyConfig = {
-    shipsPerMin: 100, // Default spawn rate
-    chargers: { emojis: [], speed: 1.0, weight: 40 }, 
-    shooters: { emojis: [], speed: 1.0, weight: 50 }, 
-    fatties:  { emojis: [], speed: 1.0, weight: 10 }  
+// DEFAULTS
+let enemyConfig = { 
+    shipsPerMin: 150, 
+    chargers: { emojis: [], speed: 1.5, weight: 10 }, 
+    shooters: { emojis: [], speed: 0.8, weight: 84 }, 
+    fatties: { emojis: [], speed: 0.5, weight: 1 },
+    buggers: { emojis: [], speed: 0.65, weight: 5 }
 };
 
-// --- 2. ASSETS ---
+// --- 2. AUDIO SYSTEM ---
+const sfx = {
+    shoot: (pitch=800) => {
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.type = 'square'; osc.frequency.setValueAtTime(pitch, audioCtx.currentTime); 
+        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+    },
+    enemyShoot: (isRocket) => {
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        let pitch = isRocket ? 100 : 300;
+        let duration = isRocket ? 0.4 : 0.2;
+        osc.frequency.setValueAtTime(pitch, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(pitch - 50, audioCtx.currentTime + duration);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+    },
+    explosion: (type) => {
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        const gain = audioCtx.createGain();
+        gain.connect(audioCtx.destination);
+
+        if (type === 'fatty' || type === 'charger') { 
+            const osc = audioCtx.createOscillator();
+            const filter = audioCtx.createBiquadFilter();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(40, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(5, audioCtx.currentTime + 0.6);
+            filter.type = 'lowpass'; filter.frequency.value = 150;
+            osc.connect(filter); filter.connect(gain);
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.6);
+        } 
+        else {
+            const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.3, audioCtx.sampleRate);
+            const data = buf.getChannelData(0); for(let i=0; i<data.length; i++) data[i] = Math.random() * 2 - 1;
+            const noise = audioCtx.createBufferSource(); noise.buffer = buf;
+            noise.connect(gain); gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3); noise.start();
+        }
+    }
+};
+
+// --- 3. ASSETS ---
 function generateSprite(type) {
     const c = document.createElement('canvas'); const x = c.getContext('2d');
     let scale = 4, w=32, h=32, colors=[], pattern=[];
@@ -131,6 +177,8 @@ function generateSprite(type) {
         colors=['#ff0055']; pattern = ["10000001","11000011","11100111","01111110","00111100","00011000","00111100","01000010"];
     } else if (type === 'shooter') {
         colors=['#00ff55']; pattern = ["00111100","01111110","11011011","11111111","01011010","10000001","10000001","00000000"];
+    } else if (type === 'bugger') {
+        colors=['#00ffff']; pattern = ["00011000","00111100","01100110","11011011","11111111","01011010","01000010","00100100"];
     } else if (type === 'fatty') {
         w=64; h=64; colors=['#aa00aa', '#ff00ff']; scale=4;
         pattern = ["0000011111100000","0001122222211000","0011222222221100","0112211221122110","1122111221112211","1122222222222211","1122221111222211","1122211221122211","1122211221122211","1122221111222211","1122222222222211","1122100000012211","0112200000022110","0011222222221100","0001122222211000","0000011111100000"];
@@ -139,6 +187,7 @@ function generateSprite(type) {
     } else if (type === 'enemy_bullet') {
         colors=['#ffaa00']; pattern=["0110","1111","1111","0110"]; w=16; h=16;
     }
+    
     c.width = w; c.height = h;
     for(let r=0; r < pattern.length; r++){ for(let col=0; col < pattern[r].length; col++){ const colorIndex = parseInt(pattern[r][col]); if(colorIndex > 0){ x.fillStyle = colors[colorIndex - 1]; x.fillRect(col*scale, r*scale, scale, scale); }}}
     return c;
@@ -146,67 +195,41 @@ function generateSprite(type) {
 
 const assets = {
     p1: generateSprite('p1'), p2: generateSprite('p2'),
-    charger: generateSprite('charger'), shooter: generateSprite('shooter'), fatty: generateSprite('fatty'),
+    charger: generateSprite('charger'), shooter: generateSprite('shooter'), 
+    fatty: generateSprite('fatty'), bugger: generateSprite('bugger'),
     bullet: generateSprite('bullet'), enemyBullet: generateSprite('enemy_bullet')
 };
 
-// --- 3. ENTITIES & SYSTEMS ---
-const players = [ { x: 200, y: 530, w: 64, h: 64, lives: 50, cd: 0, dead: false }, { x: 600, y: 530, w: 64, h: 64, lives: 50, cd: 0, dead: false } ];
+// --- 4. ENTITIES ---
+const players = [ 
+    { x: 200, y: 530, w: 64, h: 64, lives: 25, cd: 0, dead: false }, 
+    { x: 600, y: 530, w: 64, h: 64, lives: 25, cd: 0, dead: false } 
+];
 const pBullets = [], eBullets = [], enemies = [], particles = [];
 
+// Swarm
 const SWARM = { xOffset: 0, yBase: HEIGHT * 0.15, dir: 1, dropTimer: 0, slots: [], cols: 10, rows: 4, lastLowestRow: -1 };
 for(let i=0; i < SWARM.cols * SWARM.rows; i++) SWARM.slots.push(false);
 
+// Stars
 const stars = [];
-const starLayers = [
-    { count: 150, size: 1, speed: 0.001 },
-    { count: 75,  size: 2, speed: 0.004 },
-    { count: 30,  size: 3, speed: 0.008 },
-    { count: 15,  size: 4, speed: 0.015 }
-];
-function initStars() {
-    stars.length = 0;
-    starLayers.forEach(layer => {
-        for(let i=0; i<layer.count; i++) stars.push({ x: Math.random() * WIDTH, y: Math.random() * HEIGHT, size: layer.size, speedBase: layer.speed });
-    });
-}
+const starLayers = [ { count: 150, size: 1, speed: 0.001 }, { count: 75,  size: 2, speed: 0.004 }, { count: 30,  size: 3, speed: 0.008 }, { count: 15,  size: 4, speed: 0.015 } ];
+function initStars() { stars.length = 0; starLayers.forEach(layer => { for(let i=0; i<layer.count; i++) stars.push({ x: Math.random() * WIDTH, y: Math.random() * HEIGHT, size: layer.size, speedBase: layer.speed }); }); }
 initStars();
-function updateStars(dt) {
-    stars.forEach(star => { star.y += star.speedBase * dt; if(star.y > HEIGHT) { star.y = -star.size; star.x = Math.random() * WIDTH; }});
-}
-function drawStars() {
-    ctx.fillStyle = '#fff'; stars.forEach(star => ctx.fillRect(star.x, star.y, star.size, star.size));
-}
+function updateStars(dt) { stars.forEach(star => { star.y += star.speedBase * dt; if(star.y > HEIGHT) { star.y = -star.size; star.x = Math.random() * WIDTH; }}); }
+function drawStars() { ctx.fillStyle = '#fff'; stars.forEach(star => ctx.fillRect(star.x, star.y, star.size, star.size)); }
 
-const sfx = {
-    shoot: (pitch=800) => {
-        if(audioCtx.state === 'suspended') audioCtx.resume();
-        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
-        osc.type = 'square'; osc.frequency.setValueAtTime(pitch, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.05, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-        osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.2);
-    },
-    explosion: () => {
-        if(audioCtx.state === 'suspended') audioCtx.resume();
-        const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.5, audioCtx.sampleRate);
-        const data = buf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-        const noise = audioCtx.createBufferSource(); noise.buffer = buf;
-        const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
-        noise.connect(gain); gain.connect(audioCtx.destination); noise.start();
-    }
-};
-
-// --- 4. PARSER ---
-
+// --- 5. CONFIG PARSER ---
 function parseEnemyText(text) {
     if(!text || text.trim() === "") return;
     
-    // Reset configs
-    const newConfig = {
-        shipsPerMin: 100, // Reset to default
-        chargers: { emojis: [], speed: 1.0, weight: 40 },
-        shooters: { emojis: [], speed: 1.0, weight: 50 },
-        fatties:  { emojis: [], speed: 1.0, weight: 10 }
+    // FIX: Initialize ALL classes here to avoid "undefined" errors
+    const newConfig = { 
+        shipsPerMin: 150, 
+        chargers: { emojis: [], speed: 1.5, weight: 10 }, 
+        shooters: { emojis: [], speed: 0.8, weight: 84 }, 
+        fatties: { emojis: [], speed: 0.5, weight: 1 }, 
+        buggers: { emojis: [], speed: 0.65, weight: 5 } 
     };
     
     const lines = text.split('\n');
@@ -218,118 +241,112 @@ function parseEnemyText(text) {
     
     lines.forEach(line => {
         const l = line.trim().toLowerCase();
-        
-        // Global Settings Check
         const spmMatch = line.match(spmRegex);
-        if (spmMatch) {
-            let val = parseInt(spmMatch[1]);
-            if (val < 1) val = 1;
-            if (val > 9999) val = 9999;
-            newConfig.shipsPerMin = val;
-        }
-
-        // Section Headers
-        if(l.includes('[chargers]')) { currentSection = 'chargers'; }
-        else if(l.includes('[shooters]')) { currentSection = 'shooters'; }
+        if (spmMatch) { let val = parseInt(spmMatch[1]); if (val < 1) val = 1; if (val > 9999) val = 9999; newConfig.shipsPerMin = val; }
+        
+        if(l.includes('[chargers]')) { currentSection = 'chargers'; } 
+        else if(l.includes('[shooters]')) { currentSection = 'shooters'; } 
         else if(l.includes('[fatties]')) { currentSection = 'fatties'; }
+        else if(l.includes('[buggers]')) { currentSection = 'buggers'; }
         
         if (currentSection) {
-            // Stats
             const speedMatch = line.match(speedRegex);
             const commMatch = line.match(commRegex);
-            
             if (speedMatch) newConfig[currentSection].speed = parseFloat(speedMatch[1]) / 100;
             if (commMatch) newConfig[currentSection].weight = parseFloat(commMatch[1]);
-
-            // Emojis
             const found = line.match(emojiRegex);
             if(found) newConfig[currentSection].emojis.push(...found);
         }
     });
-
-    let total = newConfig.chargers.emojis.length + newConfig.shooters.emojis.length + newConfig.fatties.emojis.length;
     
-    // Accept config if either emojis exist OR we set SPM
+    let total = 0;
+    // Count Emojis found
+    Object.keys(newConfig).forEach(k => {
+        if(newConfig[k].emojis) total += newConfig[k].emojis.length;
+    });
+
     enemyConfig = newConfig;
-    showToast(`Config Loaded! (${newConfig.shipsPerMin} ships/min)`);
-    console.log("New Config:", enemyConfig);
+    if(total > 0) showToast(`Config Loaded! (${newConfig.shipsPerMin} ships/min)`);
+    else if (arguments[1] === true) showToast("File empty/invalid."); 
 }
 
-// Auto-Load
 window.addEventListener('load', () => {
-    fetch('enemies.txt')
-        .then(res => { if(!res.ok) throw new Error("No config"); return res.text(); })
-        .then(text => parseEnemyText(text))
-        .catch(e => console.log("No default enemies.txt found."));
-
-    const imgs = ['p1.png', 'p2.png', 'enemy.png'];
+    fetch('enemies.txt').then(res => { if(!res.ok) throw new Error("No config"); return res.text(); }).then(text => parseEnemyText(text)).catch(e => console.log("No default enemies.txt found."));
+    const imgs = ['p1.png', 'p2.png', 'Ship1.png', 'Ship2.png', 'ship1.png', 'ship2.png', 'enemy.png'];
     imgs.forEach(name => {
         const i = new Image(); i.src = name;
         i.onload = () => {
-            if(name.includes('p1')) assets.p1 = i;
-            if(name.includes('p2')) assets.p2 = i;
-            if(name.includes('enemy')) { assets.charger=i; assets.shooter=i; }
+            const lower = name.toLowerCase();
+            if(lower.includes('p1') || lower.includes('ship1')) assets.p1 = i;
+            if(lower.includes('p2') || lower.includes('ship2')) assets.p2 = i;
+            if(lower.includes('enemy')) { assets.charger=i; assets.shooter=i; assets.bugger=i; }
         };
     });
 });
 
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.innerText = msg; t.style.opacity = 1;
-    setTimeout(() => t.style.opacity = 0, 3000);
+function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.style.opacity = 1; setTimeout(() => t.style.opacity = 0, 3000); }
+document.getElementById('customBtn').addEventListener('click', () => { document.getElementById('hiddenFileInput').click(); });
+document.getElementById('hiddenFileInput').addEventListener('change', (e) => { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = function(event){ parseEnemyText(event.target.result, true); canvas.focus(); }; reader.readAsText(file); e.target.value = ''; });
+
+// --- 6. GAME LOGIC ---
+let spawnTimer = 0;
+
+// HELPER: Smooth Angle Interpolation (Steering)
+function lerpAngle(a, b, t) {
+    let diff = b - a;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    return a + diff * t;
 }
 
-document.getElementById('customBtn').addEventListener('click', () => { document.getElementById('hiddenFileInput').click(); });
-document.getElementById('hiddenFileInput').addEventListener('change', (e) => {
-    const file = e.target.files[0]; if(!file) return;
-    const reader = new FileReader();
-    reader.onload = function(event){ parseEnemyText(event.target.result, true); canvas.focus(); }
-    reader.readAsText(file); e.target.value = '';
-});
-
-// --- 5. GAME LOGIC ---
-
-function createExplosion(x, y, color) {
-    for(let i=0; i<15; i++) {
-        particles.push({ x: x, y: y, vx: (Math.random()-0.5)*6, vy: (Math.random()-0.5)*6, life: 1.0, color: color, size: 4+Math.random()*4 });
-    }
+function createExplosion(x, y, color, scale = 1.0) {
+    for(let i=0; i<15; i++) particles.push({ x: x, y: y, vx: (Math.random()-0.5)*6, vy: (Math.random()-0.5)*6, life: 1.0, color: color, size: (4+Math.random()*4)*scale });
 }
 
 function spawnEnemy() {
-    const weights = { charger: enemyConfig.chargers.weight, shooter: enemyConfig.shooters.weight, fatty: enemyConfig.fatties.weight };
-    const totalWeight = weights.charger + weights.shooter + weights.fatty;
-    let randomNum = Math.random() * totalWeight;
-    
+    const w = { c: enemyConfig.chargers.weight, s: enemyConfig.shooters.weight, f: enemyConfig.fatties.weight, b: enemyConfig.buggers.weight };
+    const total = w.c + w.s + w.f + w.b;
+    let r = Math.random() * total;
     let type = 'charger';
-    if (randomNum < weights.charger) type = 'charger';
-    else if (randomNum < weights.charger + weights.shooter) type = 'shooter';
-    else type = 'fatty';
+    
+    if (r < w.c) type = 'charger';
+    else if (r < w.c + w.s) type = 'shooter';
+    else if (r < w.c + w.s + w.f) type = 'fatty';
+    else type = 'bugger';
 
     if (type === 'shooter') {
         let hasSlot = false;
         for(let i=0; i<SWARM.slots.length; i++) if(!SWARM.slots[i]) hasSlot = true;
-        if(!hasSlot) type = 'charger';
+        if(!hasSlot) type = 'charger'; // Fallback
     }
 
     const e = { 
         type: type, x: Math.random()*(WIDTH-64), y: -70, 
-        w: (type==='fatty')?64:32, h: (type==='fatty')?64:32, hp: (type==='fatty')?3:1, 
+        w: 32, h: 32, hp: 1, 
         flashTimer: 0, emoji: null, state: 'entering', slotIndex: -1, gridRow: 0, gridCol: 0, 
-        color: '#ff0055', speedMult: 1.0 
+        color: '#ff0055', speedMult: 1.0,
+        // Bugger vars
+        angle: 0, centerX: 0, stopTimer: 0, aimAngle: 0, burstCount: 0, rotation: 0
     };
 
-    if (type === 'charger') {
-        e.color = '#ff0055'; e.speedMult = enemyConfig.chargers.speed;
-    } else if(type === 'shooter') {
+    if (type === 'charger') { e.color = '#ff0055'; e.speedMult = enemyConfig.chargers.speed; } 
+    else if(type === 'shooter') {
         e.color = '#00ff55'; e.speedMult = enemyConfig.shooters.speed;
-        for(let i=0; i<SWARM.slots.length; i++) {
-            if(!SWARM.slots[i]) { SWARM.slots[i] = true; e.slotIndex = i; e.gridRow = Math.floor(i / SWARM.cols); e.gridCol = i % SWARM.cols; e.x = (WIDTH/2) + ((e.gridCol - SWARM.cols/2) * 40); break; }
-        }
-    } else if (type === 'fatty') {
-        e.color = '#aa00aa'; e.speedMult = enemyConfig.fatties.speed;
+        for(let i=0; i<SWARM.slots.length; i++) { if(!SWARM.slots[i]) { SWARM.slots[i] = true; e.slotIndex = i; e.gridRow = Math.floor(i / SWARM.cols); e.gridCol = i % SWARM.cols; e.x = (WIDTH/2) + ((e.gridCol - SWARM.cols/2) * 40); break; } }
+    } 
+    else if (type === 'fatty') { 
+        e.color = '#aa00aa'; e.speedMult = enemyConfig.fatties.speed; e.w=64; e.h=64; e.hp=3; 
+    }
+    else if (type === 'bugger') {
+        e.color = '#00ffff'; e.speedMult = enemyConfig.buggers.speed;
+        e.centerX = Math.random() * (WIDTH - 100) + 50; 
+        e.angle = Math.random() * Math.PI * 2;
+        e.state = 'moving';
     }
 
-    let poolKey = type + 's'; if(type === 'fatty') poolKey = 'fatties';
+    let poolKey = type + 's'; 
+    if(type === 'fatty') poolKey = 'fatties';
+    // Fallback for singular/plural mismatch in key access if needed, but config keys are plural
     let pool = enemyConfig[poolKey].emojis;
     if(pool && pool.length > 0) e.emoji = pool[Math.floor(Math.random() * pool.length)];
     
@@ -341,7 +358,7 @@ function update(dt) {
     if(!gameStarted || gameOver) return;
     animFrame++;
 
-    // Swarm
+    // Swarm Logic
     let lowestRow = -1; enemies.forEach(e => { if(e.type === 'shooter' && e.gridRow > lowestRow) lowestRow = e.gridRow; });
     if(lowestRow < SWARM.lastLowestRow && SWARM.lastLowestRow !== -1 && lowestRow !== -1) SWARM.yBase = HEIGHT * 0.15;
     SWARM.lastLowestRow = lowestRow;
@@ -354,85 +371,231 @@ function update(dt) {
         if(p.dead) return;
         if(i===0) {
             if(keys['ArrowLeft']) p.x -= 0.4 * dt; if(keys['ArrowRight']) p.x += 0.4 * dt;
-            if((keys['ControlLeft']||keys['ShiftLeft']||keys['KeyQ']) && p.cd <= 0) { pBullets.push({x: p.x+24, y: p.y, w:8, h:16}); sfx.shoot(800); p.cd = 200; }
+            if((keys['ControlLeft']||keys['ShiftLeft']||keys['KeyQ']) && p.cd <= 0) { 
+                pBullets.push({x: p.x+24, y: p.y, w:8, h:16, owner: 0}); sfx.shoot(800); p.cd = 200; 
+            }
         } else if(gamepadIndex !== null) {
             const gp = navigator.getGamepads()[gamepadIndex];
-            if(gp) { if(Math.abs(gp.axes[0])>0.1) p.x += gp.axes[0]*0.4*dt; if(gp.buttons[0].pressed && p.cd <= 0) { pBullets.push({x: p.x+24, y: p.y, w:8, h:16}); sfx.shoot(800); p.cd = 200; }}
+            if(gp) { if(Math.abs(gp.axes[0])>0.1) p.x += gp.axes[0]*0.4*dt; if(gp.buttons[0].pressed && p.cd <= 0) { 
+                pBullets.push({x: p.x+24, y: p.y, w:8, h:16, owner: 1}); sfx.shoot(800); p.cd = 200; 
+            }}
         }
         p.cd -= dt; if(p.x < 0) p.x = 0; if(p.x > WIDTH-p.w) p.x = WIDTH-p.w;
     });
 
-    // Enemies (Rate Controlled)
-    spawnTimer += dt;
-    const interval = 60000 / enemyConfig.shipsPerMin;
-    if (spawnTimer > interval) {
-        spawnEnemy();
-        spawnTimer = 0;
-    }
+    // Spawn
+    spawnTimer += dt; const interval = 60000 / enemyConfig.shipsPerMin;
+    if (spawnTimer > interval) { spawnEnemy(); spawnTimer = 0; }
 
+    // Enemy Updates
     for(let i=enemies.length-1; i>=0; i--) {
         let e = enemies[i];
         
-        if(e.type === 'charger') { e.y += 0.25 * e.speedMult * dt; } 
+        // --- CHARGER ---
+        if(e.type === 'charger') { 
+            e.y += 0.25 * e.speedMult * dt; 
+        } 
+        // --- FATTY ---
         else if(e.type === 'fatty') { 
             e.y += 0.04 * e.speedMult * dt; 
-            if(Math.random() < 0.01) { eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, big: true}); sfx.shoot(150); }
+            if(Math.random() < 0.01) { eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, type: 'rocket', vx: 0, vy: 0.3*dt}); sfx.enemyShoot(true); } 
         }
+        // --- SHOOTER ---
         else if(e.type === 'shooter') {
             let targetY = SWARM.yBase + (e.gridRow * 40); let targetX = (WIDTH/2) + SWARM.xOffset + ((e.gridCol - SWARM.cols/2) * 40);
-            if(e.state === 'entering') { 
-                e.y += 0.2 * e.speedMult * dt; e.x += (targetX - e.x) * 0.05; 
-                if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; }
+            if(e.state === 'entering') { e.y += 0.2 * e.speedMult * dt; e.x += (targetX - e.x) * 0.05; if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; } }
+            else { e.y = targetY; e.x = targetX; if(Math.random() < 0.002) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: 0, vy: 0.4*dt}); sfx.enemyShoot(false); } }
+        }
+        // --- BUGGER ---
+        else if (e.type === 'bugger') {
+            if (e.state === 'moving') {
+                e.angle += 0.003 * dt;
+                
+                // Calculate position ahead of time to determine rotation vector
+                let oldX = e.x;
+                let oldY = e.y;
+                
+                // Add drift and circular movement
+                e.y += 0.1 * e.speedMult * dt; 
+                e.x = e.centerX + Math.cos(e.angle) * 60;
+                e.y += Math.sin(e.angle) * 30; // Oval motion effect
+                
+                let dx = e.x - oldX;
+                let dy = e.y - oldY;
+                
+                // TARGET: Angle of movement + PI/2 (so top faces direction)
+                let targetRotation = Math.atan2(dy, dx) + Math.PI/2;
+                
+                // Smoothly steer current rotation towards target
+                e.rotation = lerpAngle(e.rotation, targetRotation, 0.1 * dt/16);
+
+                if(Math.random() < 0.005) { e.state = 'aiming'; e.stopTimer = 500; }
+            } 
+            else if (e.state === 'aiming') {
+                e.stopTimer -= dt;
+                // Aim towards player
+                let target = (!players[0].dead) ? players[0] : players[1];
+                if (!players[1].dead && Math.abs(players[1].x - e.x) < Math.abs(players[0].x - e.x)) target = players[1];
+                
+                let targetAimAngle = Math.atan2(target.y - e.y, target.x - e.x) - Math.PI/2;
+                
+                // Smoothly steer towards player
+                e.rotation = lerpAngle(e.rotation, targetAimAngle, 0.1 * dt/16);
+                e.aimAngle = e.rotation; // Lock firing angle to visual rotation
+
+                if (e.stopTimer <= 0) {
+                    e.state = 'bursting';
+                    e.burstCount = 3;
+                    e.stopTimer = 0;
+                }
             }
-            else { 
-                e.y = targetY; e.x = targetX; 
-                if(Math.random() < 0.002) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, big: false}); sfx.shoot(300); }
+            else if (e.state === 'bursting') {
+                e.stopTimer += dt;
+                if (e.stopTimer > 100) { 
+                    let angle = e.aimAngle + Math.PI/2;
+                    eBullets.push({
+                        x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, 
+                        type: 'laser', 
+                        vx: Math.cos(angle)*0.3*dt, vy: Math.sin(angle)*0.3*dt
+                    });
+                    sfx.enemyShoot(false);
+                    e.burstCount--;
+                    e.stopTimer = 0;
+                    if(e.burstCount <= 0) e.state = 'moving';
+                }
             }
         }
+
         if(e.flashTimer > 0) e.flashTimer--;
 
+        // Player Bullets Hit
         for(let bIdx=pBullets.length-1; bIdx>=0; bIdx--) {
             let b = pBullets[bIdx];
             if(rectIntersect(e, b)) {
-                e.hp--; pBullets.splice(bIdx, 1);
-                if(e.hp > 0) { e.flashTimer = 5; } else { if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; createExplosion(e.x+e.w/2, e.y+e.h/2, e.color); sfx.explosion(); enemies.splice(i, 1); }
+                e.hp--; 
+                if(b.owner === 0) p1Cash += 0.01; else p2Cash += 0.01;
+                pBullets.splice(bIdx, 1);
+                if(e.hp > 0) { e.flashTimer = 5; } else { 
+                    if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; 
+                    createExplosion(e.x+e.w/2, e.y+e.h/2, e.color); sfx.explosion(e.type); enemies.splice(i, 1); 
+                }
                 break;
             }
         }
+
+        // Crash (Charger Kamikaze)
+        if (e.type === 'charger') {
+            players.forEach(p => {
+                if(!p.dead && rectIntersect(p, e)) {
+                    p.lives--;
+                    createExplosion(e.x+e.w/2, e.y+e.h/2, '#ffaa00', 2.0); 
+                    sfx.explosion('fatty'); 
+                    enemies.splice(i, 1);
+                    if(p.lives <= 0) p.dead = true;
+                }
+            });
+        }
+
         if(e.y > HEIGHT) { if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; enemies.splice(i, 1); }
     }
 
-    // Particles
+    // High Score
+    if(players[0].dead && players[1].dead) {
+        if(!gameOver) {
+            let totalRun = p1Cash + p2Cash;
+            if(totalRun > highCash) { highCash = totalRun; localStorage.setItem('galago_high_cash', highCash); }
+        }
+        gameOver = true;
+    }
+
     for(let i=particles.length-1; i>=0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05; if(p.life <= 0) particles.splice(i, 1); }
-    updateBullets(pBullets, -0.6, dt); updateBullets(eBullets, 0.4, dt);
-    eBullets.forEach((b, bIdx) => { players.forEach(p => { if(!p.dead && rectIntersect(p, b)) { p.lives--; eBullets.splice(bIdx, 1); sfx.explosion(); createExplosion(p.x+32, p.y+32, '#fff'); if(p.lives <= 0) p.dead = true; }}); });
-    if(players[0].dead && players[1].dead) gameOver = true;
+    updateBullets(pBullets, -0.6, dt); 
+    
+    // Enemy Bullets (Rocket vs Laser)
+    for(let i=eBullets.length-1; i>=0; i--) {
+        let b = eBullets[i];
+        b.x += b.vx || 0; 
+        b.y += b.vy;
+        
+        if (b.type === 'rocket') {
+            if (Math.random() < 0.3) particles.push({ x: b.x+12, y: b.y, vx: (Math.random()-0.5), vy: -1, life: 0.5, color: '#aaa', size: 3 });
+        }
+
+        if(b.y > HEIGHT || b.x < 0 || b.x > WIDTH) eBullets.splice(i, 1);
+    }
+
+    eBullets.forEach((b, bIdx) => { players.forEach(p => { if(!p.dead && rectIntersect(p, b)) { p.lives--; eBullets.splice(bIdx, 1); sfx.explosion('charger'); createExplosion(p.x+32, p.y+32, '#fff'); if(p.lives <= 0) p.dead = true; }}); });
 }
 function updateBullets(arr, spd, dt) { for(let i=arr.length-1; i>=0; i--) { arr[i].y += spd * dt; if(arr[i].y < -20 || arr[i].y > HEIGHT+20) arr.splice(i, 1); }}
+
+// --- DRAWING ---
+function drawArrow(x, y, dir) {
+    ctx.lineWidth = 4; ctx.strokeStyle = '#0f0'; ctx.beginPath();
+    if (dir === 'left') { ctx.moveTo(x + 20, y - 10); ctx.lineTo(x, y - 10); ctx.lineTo(x, y - 25); ctx.lineTo(x - 25, y); ctx.lineTo(x, y + 25); ctx.lineTo(x, y + 10); ctx.lineTo(x + 20, y + 10); ctx.lineTo(x + 20, y - 10); } 
+    else { ctx.moveTo(x - 20, y - 10); ctx.lineTo(x, y - 10); ctx.lineTo(x, y - 25); ctx.lineTo(x + 25, y); ctx.lineTo(x, y + 25); ctx.lineTo(x, y + 10); ctx.lineTo(x - 20, y + 10); ctx.lineTo(x - 20, y - 10); }
+    ctx.stroke();
+}
 
 function draw() {
     ctx.fillStyle = '#111'; ctx.fillRect(0,0,WIDTH,HEIGHT);
     if(showStars) drawStars();
-    if(!gameStarted && !gameOver) { ctx.fillStyle = "#0f0"; ctx.font = "30px Courier New"; ctx.textAlign = "center"; ctx.fillText("READY: PRESS ARROW KEY", WIDTH/2, HEIGHT/2); return; }
+
+    if(!gameStarted && !gameOver) {
+        ctx.fillStyle = "#0f0"; ctx.font = "24px Courier New"; ctx.textAlign = "center";
+        ctx.fillText("Highest Piles of Space Bucks: $" + highCash.toFixed(2), WIDTH/2, 50);
+        ctx.font = "30px Courier New";
+        ctx.fillText("HIT", WIDTH/2 - 70, HEIGHT/2 + 10);
+        drawArrow(WIDTH/2, HEIGHT/2, 'left'); drawArrow(WIDTH/2 + 70, HEIGHT/2, 'right');
+        return;
+    }
+    
     if(gameOver) { ctx.fillStyle = "red"; ctx.font = "50px Courier New"; ctx.textAlign = "center"; ctx.fillText("GAME OVER", WIDTH/2, HEIGHT/2); return; }
 
     particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1.0; });
     players.forEach((p, i) => { if(!p.dead) ctx.drawImage(assets['p'+(i+1)], p.x, p.y, p.w, p.h); });
+    
     enemies.forEach(e => {
-        if(e.flashTimer > 0) { ctx.save(); ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = "white"; ctx.fillRect(e.x, e.y, e.w, e.h); ctx.restore(); }
-        else {
-            if(e.emoji) { ctx.font = (e.type==='fatty'?"50px":"28px")+" Arial"; ctx.textAlign="center"; ctx.fillText(e.emoji, e.x+e.w/2, e.y+e.h/1.2); }
-            else { ctx.drawImage(assets[e.type], e.x, e.y, e.w, e.h); }
+        // Rotation for buggers
+        if (e.type === 'bugger') {
+            ctx.save();
+            ctx.translate(e.x + e.w/2, e.y + e.h/2);
+            ctx.rotate(e.rotation);
+            if(e.emoji) { ctx.font = "28px Arial"; ctx.textAlign="center"; ctx.fillText(e.emoji, 0, 10); }
+            else { ctx.drawImage(assets[e.type], -e.w/2, -e.h/2, e.w, e.h); }
+            ctx.restore();
+        } else {
+            if(e.flashTimer > 0) { ctx.save(); ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = "white"; ctx.fillRect(e.x, e.y, e.w, e.h); ctx.restore(); }
+            else {
+                if(e.emoji) { ctx.font = (e.type==='fatty'?"50px":"28px")+" Arial"; ctx.textAlign="center"; ctx.fillText(e.emoji, e.x+e.w/2, e.y+e.h/1.2); }
+                else { ctx.drawImage(assets[e.type], e.x, e.y, e.w, e.h); }
+            }
         }
     });
 
     ctx.fillStyle = "#ff0"; pBullets.forEach(b => ctx.drawImage(assets.bullet, b.x, b.y, b.w, b.h));
-    eBullets.forEach(b => { if(b.big) ctx.drawImage(assets.enemyBullet, b.x, b.y, b.w, b.h); else ctx.drawImage(assets.enemyBullet, b.x, b.y, b.w, b.h); });
-    ctx.font = "20px Courier New"; ctx.textAlign = "left"; ctx.fillStyle = "#0f0"; ctx.fillText(`P1: ${players[0].lives}`, 20, 30); ctx.fillStyle = "#5050ff"; ctx.fillText(`P2: ${players[1].lives}`, WIDTH-160, 30);
+    
+    // Flashing Enemy Bullets + Rockets
+    eBullets.forEach(b => {
+        if(b.type === 'rocket') {
+            ctx.fillStyle = '#ccc';
+            ctx.beginPath(); ctx.moveTo(b.x + b.w/2, b.y); ctx.lineTo(b.x + b.w, b.y + b.h); ctx.lineTo(b.x, b.y + b.h); ctx.fill();
+        } else {
+            ctx.fillStyle = (animFrame % 4 < 2) ? '#ff0000' : '#ff7700';
+            ctx.fillRect(b.x, b.y, b.w, b.h);
+        }
+    });
+    
+    document.getElementById('p1Stats').innerHTML = `Space Bucks: $${p1Cash.toFixed(2)}<br>Lives: ${players[0].lives}`;
+    document.getElementById('p2Stats').innerHTML = `Space Bucks: $${p2Cash.toFixed(2)}<br>Lives: ${players[1].lives}`;
 }
 function rectIntersect(r1, r2) { return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y); }
 
-window.addEventListener('keydown', e => { keys[e.code] = true; if((e.code==='ArrowLeft'||e.code==='ArrowRight') && !gameStarted) { gameStarted=true; audioCtx.resume(); } if(e.code === 'KeyB') showStars = !showStars; });
+window.addEventListener('keydown', e => { 
+    keys[e.code] = true; 
+    if((e.code==='ArrowLeft'||e.code==='ArrowRight') && !gameStarted) { 
+        gameStarted=true; showStars=true; audioCtx.resume(); 
+    } 
+});
 window.addEventListener('keyup', e => keys[e.code] = false);
 window.addEventListener("gamepadconnected", e => gamepadIndex = e.gamepad.index);
 function loop(t) { let dt = t - lastTime; if(dt>100) dt=100; lastTime = t; update(dt); draw(); requestAnimationFrame(loop); }
