@@ -1,35 +1,30 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>galago v20</title>
-    <style>body { font-family: monospace; padding: 20px; }</style>
-</head>
-<body>
-    <pre><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>GALAGO</title>
     <style>
-        /* REVERTED TO PROVEN WORKING CSS */
+        /* --- NUCLEAR LAYOUT FIX --- */
         body {
             background-color: #1a1a2e;
             color: #fff;
             font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            
+            /* Removed display: flex entirely. 
+               This forces standard "Top-to-Bottom" stacking. */
+            display: block; 
+            
+            text-align: center; /* Centers text inside the body */
             margin: 0;
-            padding: 10px; /* Simple padding, no forced height */
-            overflow: hidden;
+            padding: 20px; 
         }
         
+        /* 'margin: 0 auto' centers blocks horizontally without moving them down */
         #hud {
-            width: 800px;
+            width: 720px; 
+            margin: 0 auto 5px auto; /* Center horizontally, 5px bottom margin */
             display: flex;
             justify-content: space-between;
-            margin-bottom: 5px;
             font-weight: bold;
             color: #0f0; 
             font-size: 18px;
@@ -37,6 +32,9 @@
         }
 
         #gameContainer {
+            width: 720px; /* Explicit width needed for margin: auto to work */
+            height: 540px;
+            margin: 0 auto; /* Center the black box horizontally */
             position: relative;
             border: 4px solid #444;
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
@@ -49,8 +47,13 @@
         }
 
         .controls-info {
-            background: #333; padding: 10px; margin-top: 10px;
-            font-size: 0.8em; text-align: center; width: 800px; color: #fff;
+            background: #333; 
+            padding: 10px; 
+            margin: 10px auto 0 auto; /* Center horizontally, 10px top margin */
+            font-size: 0.8em; 
+            text-align: center; 
+            width: 720px; 
+            color: #fff;
         }
 
         #customBtn {
@@ -79,7 +82,7 @@
     </div>
 
     <div id="gameContainer">
-        <canvas id="gameCanvas" width="800" height="600" tabindex="1"></canvas>
+        <canvas id="gameCanvas" width="720" height="540" tabindex="1"></canvas>
     </div>
 
     <div class="controls-info">
@@ -95,8 +98,10 @@
 // --- 1. SETUP CONSTANTS & STATE ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const WIDTH = 800;
-const HEIGHT = 600;
+
+// DIMENSIONS (10% Smaller)
+const WIDTH = 720; 
+const HEIGHT = 540;
 
 let lastTime = 0;
 let gameStarted = false;
@@ -209,9 +214,10 @@ const assets = {
 };
 
 // --- 4. ENTITIES ---
+// Spawn coords adjusted for 720x540
 const players = [ 
-    { x: 200, y: 530, w: 64, h: 64, lives: 25, cd: 0, dead: false }, 
-    { x: 600, y: 530, w: 64, h: 64, lives: 25, cd: 0, dead: false } 
+    { x: 180, y: 470, w: 64, h: 64, lives: 25, cd: 0, dead: false }, 
+    { x: 540, y: 470, w: 64, h: 64, lives: 25, cd: 0, dead: false } 
 ];
 const pBullets = [], eBullets = [], enemies = [], particles = [];
 
@@ -583,7 +589,5 @@ window.addEventListener("gamepadconnected", e => gamepadIndex = e.gamepad.index)
 function loop(t) { let dt = t - lastTime; if(dt>100) dt=100; lastTime = t; update(dt); draw(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
 </script>
-</body>
-</html></pre>
 </body>
 </html>
