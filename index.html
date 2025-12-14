@@ -1,9 +1,18 @@
 <!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>galago v20</title>
+    <style>body { font-family: monospace; padding: 20px; }</style>
+</head>
+<body>
+    <pre><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GALAGO: Smooth Steering</title>
+    <title>GALAGO</title>
     <style>
+        /* REVERTED TO PROVEN WORKING CSS */
         body {
             background-color: #1a1a2e;
             color: #fff;
@@ -12,7 +21,7 @@
             flex-direction: column;
             align-items: center;
             margin: 0;
-            padding: 10px;
+            padding: 10px; /* Simple padding, no forced height */
             overflow: hidden;
         }
         
@@ -187,7 +196,6 @@ function generateSprite(type) {
     } else if (type === 'enemy_bullet') {
         colors=['#ffaa00']; pattern=["0110","1111","1111","0110"]; w=16; h=16;
     }
-    
     c.width = w; c.height = h;
     for(let r=0; r < pattern.length; r++){ for(let col=0; col < pattern[r].length; col++){ const colorIndex = parseInt(pattern[r][col]); if(colorIndex > 0){ x.fillStyle = colors[colorIndex - 1]; x.fillRect(col*scale, r*scale, scale, scale); }}}
     return c;
@@ -222,8 +230,6 @@ function drawStars() { ctx.fillStyle = '#fff'; stars.forEach(star => ctx.fillRec
 // --- 5. CONFIG PARSER ---
 function parseEnemyText(text) {
     if(!text || text.trim() === "") return;
-    
-    // FIX: Initialize ALL classes here to avoid "undefined" errors
     const newConfig = { 
         shipsPerMin: 150, 
         chargers: { emojis: [], speed: 1.5, weight: 10 }, 
@@ -260,11 +266,7 @@ function parseEnemyText(text) {
     });
     
     let total = 0;
-    // Count Emojis found
-    Object.keys(newConfig).forEach(k => {
-        if(newConfig[k].emojis) total += newConfig[k].emojis.length;
-    });
-
+    Object.keys(newConfig).forEach(k => { if(newConfig[k].emojis) total += newConfig[k].emojis.length; });
     enemyConfig = newConfig;
     if(total > 0) showToast(`Config Loaded! (${newConfig.shipsPerMin} ships/min)`);
     else if (arguments[1] === true) showToast("File empty/invalid."); 
@@ -291,7 +293,6 @@ document.getElementById('hiddenFileInput').addEventListener('change', (e) => { c
 // --- 6. GAME LOGIC ---
 let spawnTimer = 0;
 
-// HELPER: Smooth Angle Interpolation (Steering)
 function lerpAngle(a, b, t) {
     let diff = b - a;
     while (diff > Math.PI) diff -= Math.PI * 2;
@@ -317,7 +318,7 @@ function spawnEnemy() {
     if (type === 'shooter') {
         let hasSlot = false;
         for(let i=0; i<SWARM.slots.length; i++) if(!SWARM.slots[i]) hasSlot = true;
-        if(!hasSlot) type = 'charger'; // Fallback
+        if(!hasSlot) type = 'charger';
     }
 
     const e = { 
@@ -326,7 +327,10 @@ function spawnEnemy() {
         flashTimer: 0, emoji: null, state: 'entering', slotIndex: -1, gridRow: 0, gridCol: 0, 
         color: '#ff0055', speedMult: 1.0,
         // Bugger vars
-        angle: 0, centerX: 0, stopTimer: 0, aimAngle: 0, burstCount: 0, rotation: 0
+        angle: Math.random() * Math.PI * 2, 
+        centerX: Math.random() * (WIDTH - 100) + 50, 
+        centerY: -70,
+        stopTimer: 0, aimAngle: 0, burstCount: 0, rotation: 0
     };
 
     if (type === 'charger') { e.color = '#ff0055'; e.speedMult = enemyConfig.chargers.speed; } 
@@ -339,14 +343,11 @@ function spawnEnemy() {
     }
     else if (type === 'bugger') {
         e.color = '#00ffff'; e.speedMult = enemyConfig.buggers.speed;
-        e.centerX = Math.random() * (WIDTH - 100) + 50; 
-        e.angle = Math.random() * Math.PI * 2;
         e.state = 'moving';
     }
 
     let poolKey = type + 's'; 
     if(type === 'fatty') poolKey = 'fatties';
-    // Fallback for singular/plural mismatch in key access if needed, but config keys are plural
     let pool = enemyConfig[poolKey].emojis;
     if(pool && pool.length > 0) e.emoji = pool[Math.floor(Math.random() * pool.length)];
     
@@ -392,9 +393,7 @@ function update(dt) {
         let e = enemies[i];
         
         // --- CHARGER ---
-        if(e.type === 'charger') { 
-            e.y += 0.25 * e.speedMult * dt; 
-        } 
+        if(e.type === 'charger') { e.y += 0.25 * e.speedMult * dt; } 
         // --- FATTY ---
         else if(e.type === 'fatty') { 
             e.y += 0.04 * e.speedMult * dt; 
@@ -406,61 +405,41 @@ function update(dt) {
             if(e.state === 'entering') { e.y += 0.2 * e.speedMult * dt; e.x += (targetX - e.x) * 0.05; if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; } }
             else { e.y = targetY; e.x = targetX; if(Math.random() < 0.002) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: 0, vy: 0.4*dt}); sfx.enemyShoot(false); } }
         }
-        // --- BUGGER ---
+        // --- BUGGER (Fixed) ---
         else if (e.type === 'bugger') {
             if (e.state === 'moving') {
                 e.angle += 0.003 * dt;
-                
-                // Calculate position ahead of time to determine rotation vector
-                let oldX = e.x;
-                let oldY = e.y;
-                
-                // Add drift and circular movement
-                e.y += 0.1 * e.speedMult * dt; 
+                let nextAngle = e.angle + 0.1;
+                let moveStep = 0.1 * e.speedMult * dt;
+                e.centerY += moveStep; 
                 e.x = e.centerX + Math.cos(e.angle) * 60;
-                e.y += Math.sin(e.angle) * 30; // Oval motion effect
+                e.y = e.centerY + Math.sin(e.angle) * 30; 
                 
-                let dx = e.x - oldX;
-                let dy = e.y - oldY;
-                
-                // TARGET: Angle of movement + PI/2 (so top faces direction)
+                let nextX = e.centerX + Math.cos(nextAngle) * 60;
+                let nextY = (e.centerY + moveStep) + Math.sin(nextAngle) * 30;
+                let dx = nextX - e.x;
+                let dy = nextY - e.y;
                 let targetRotation = Math.atan2(dy, dx) + Math.PI/2;
-                
-                // Smoothly steer current rotation towards target
                 e.rotation = lerpAngle(e.rotation, targetRotation, 0.1 * dt/16);
 
                 if(Math.random() < 0.005) { e.state = 'aiming'; e.stopTimer = 500; }
             } 
             else if (e.state === 'aiming') {
                 e.stopTimer -= dt;
-                // Aim towards player
                 let target = (!players[0].dead) ? players[0] : players[1];
                 if (!players[1].dead && Math.abs(players[1].x - e.x) < Math.abs(players[0].x - e.x)) target = players[1];
-                
                 let targetAimAngle = Math.atan2(target.y - e.y, target.x - e.x) - Math.PI/2;
-                
-                // Smoothly steer towards player
                 e.rotation = lerpAngle(e.rotation, targetAimAngle, 0.1 * dt/16);
-                e.aimAngle = e.rotation; // Lock firing angle to visual rotation
-
-                if (e.stopTimer <= 0) {
-                    e.state = 'bursting';
-                    e.burstCount = 3;
-                    e.stopTimer = 0;
-                }
+                e.aimAngle = e.rotation; 
+                if (e.stopTimer <= 0) { e.state = 'bursting'; e.burstCount = 3; e.stopTimer = 0; }
             }
             else if (e.state === 'bursting') {
                 e.stopTimer += dt;
                 if (e.stopTimer > 100) { 
                     let angle = e.aimAngle + Math.PI/2;
-                    eBullets.push({
-                        x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, 
-                        type: 'laser', 
-                        vx: Math.cos(angle)*0.3*dt, vy: Math.sin(angle)*0.3*dt
-                    });
+                    eBullets.push({ x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: Math.cos(angle)*0.3*dt, vy: Math.sin(angle)*0.3*dt });
                     sfx.enemyShoot(false);
-                    e.burstCount--;
-                    e.stopTimer = 0;
+                    e.burstCount--; e.stopTimer = 0;
                     if(e.burstCount <= 0) e.state = 'moving';
                 }
             }
@@ -468,7 +447,7 @@ function update(dt) {
 
         if(e.flashTimer > 0) e.flashTimer--;
 
-        // Player Bullets Hit
+        // Player Bullets
         for(let bIdx=pBullets.length-1; bIdx>=0; bIdx--) {
             let b = pBullets[bIdx];
             if(rectIntersect(e, b)) {
@@ -483,14 +462,13 @@ function update(dt) {
             }
         }
 
-        // Crash (Charger Kamikaze)
+        // Crash
         if (e.type === 'charger') {
             players.forEach(p => {
                 if(!p.dead && rectIntersect(p, e)) {
                     p.lives--;
                     createExplosion(e.x+e.w/2, e.y+e.h/2, '#ffaa00', 2.0); 
-                    sfx.explosion('fatty'); 
-                    enemies.splice(i, 1);
+                    sfx.explosion('fatty'); enemies.splice(i, 1);
                     if(p.lives <= 0) p.dead = true;
                 }
             });
@@ -511,16 +489,11 @@ function update(dt) {
     for(let i=particles.length-1; i>=0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05; if(p.life <= 0) particles.splice(i, 1); }
     updateBullets(pBullets, -0.6, dt); 
     
-    // Enemy Bullets (Rocket vs Laser)
+    // Enemy Bullets
     for(let i=eBullets.length-1; i>=0; i--) {
         let b = eBullets[i];
-        b.x += b.vx || 0; 
-        b.y += b.vy;
-        
-        if (b.type === 'rocket') {
-            if (Math.random() < 0.3) particles.push({ x: b.x+12, y: b.y, vx: (Math.random()-0.5), vy: -1, life: 0.5, color: '#aaa', size: 3 });
-        }
-
+        b.x += b.vx || 0; b.y += b.vy;
+        if (b.type === 'rocket') { if (Math.random() < 0.3) particles.push({ x: b.x+12, y: b.y, vx: (Math.random()-0.5), vy: -1, life: 0.5, color: '#aaa', size: 3 }); }
         if(b.y > HEIGHT || b.x < 0 || b.x > WIDTH) eBullets.splice(i, 1);
     }
 
@@ -531,8 +504,19 @@ function updateBullets(arr, spd, dt) { for(let i=arr.length-1; i>=0; i--) { arr[
 // --- DRAWING ---
 function drawArrow(x, y, dir) {
     ctx.lineWidth = 4; ctx.strokeStyle = '#0f0'; ctx.beginPath();
-    if (dir === 'left') { ctx.moveTo(x + 20, y - 10); ctx.lineTo(x, y - 10); ctx.lineTo(x, y - 25); ctx.lineTo(x - 25, y); ctx.lineTo(x, y + 25); ctx.lineTo(x, y + 10); ctx.lineTo(x + 20, y + 10); ctx.lineTo(x + 20, y - 10); } 
-    else { ctx.moveTo(x - 20, y - 10); ctx.lineTo(x, y - 10); ctx.lineTo(x, y - 25); ctx.lineTo(x + 25, y); ctx.lineTo(x, y + 25); ctx.lineTo(x, y + 10); ctx.lineTo(x - 20, y + 10); ctx.lineTo(x - 20, y - 10); }
+    // Block arrow style from screenshot
+    if (dir === 'left') { 
+        ctx.moveTo(x + 30, y - 12); ctx.lineTo(x, y - 12); 
+        ctx.lineTo(x, y - 25); ctx.lineTo(x - 25, y); 
+        ctx.lineTo(x, y + 25); ctx.lineTo(x, y + 12); 
+        ctx.lineTo(x + 30, y + 12); ctx.lineTo(x + 30, y - 12); 
+    } 
+    else { 
+        ctx.moveTo(x - 30, y - 12); ctx.lineTo(x, y - 12); 
+        ctx.lineTo(x, y - 25); ctx.lineTo(x + 25, y); 
+        ctx.lineTo(x, y + 25); ctx.lineTo(x, y + 12); 
+        ctx.lineTo(x - 30, y + 12); ctx.lineTo(x - 30, y - 12); 
+    }
     ctx.stroke();
 }
 
@@ -555,7 +539,6 @@ function draw() {
     players.forEach((p, i) => { if(!p.dead) ctx.drawImage(assets['p'+(i+1)], p.x, p.y, p.w, p.h); });
     
     enemies.forEach(e => {
-        // Rotation for buggers
         if (e.type === 'bugger') {
             ctx.save();
             ctx.translate(e.x + e.w/2, e.y + e.h/2);
@@ -574,7 +557,6 @@ function draw() {
 
     ctx.fillStyle = "#ff0"; pBullets.forEach(b => ctx.drawImage(assets.bullet, b.x, b.y, b.w, b.h));
     
-    // Flashing Enemy Bullets + Rockets
     eBullets.forEach(b => {
         if(b.type === 'rocket') {
             ctx.fillStyle = '#ccc';
@@ -601,5 +583,7 @@ window.addEventListener("gamepadconnected", e => gamepadIndex = e.gamepad.index)
 function loop(t) { let dt = t - lastTime; if(dt>100) dt=100; lastTime = t; update(dt); draw(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
 </script>
+</body>
+</html></pre>
 </body>
 </html>

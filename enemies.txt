@@ -1,9 +1,10 @@
-[Chargers] <speed 150%> <Commonness 5%>
-👽
-
-[Shooters] <speed 80%> <Commonness 90%>
-👾
+[ShipsPerMin 50]
 
 
-[Fatties] <speed 50%> <Commonness 5%>
-👹
+[Chargers] <speed 150%> <Commonness 9%>
+
+[Fatties] <speed 50%> <Commonness 1%>
+
+[Shooters] <speed 80%> <Commonness 70%>
+
+[Buggers] <speed 65%> <Commonness 20%>
