@@ -4,25 +4,30 @@
     <meta charset="UTF-8">
     <title>GALAGO</title>
     <style>
-        /* --- NUCLEAR LAYOUT FIX --- */
+* {
+    margin: 0;
+    padding: 10;
+    box-sizing: border-box;
+}
+
+        /* --- NUCLEAR LAYOUT FIX (REVERTED VERSION) --- */
         body {
             background-color: #1a1a2e;
             color: #fff;
             font-family: 'Courier New', Courier, monospace;
             
-            /* Removed display: flex entirely. 
-               This forces standard "Top-to-Bottom" stacking. */
+            /* Standard Block Layout. No Flexbox. */
             display: block; 
             
-            text-align: center; /* Centers text inside the body */
+            text-align: center;
             margin: 0;
-            padding: 20px; 
+            padding: 20px 0 0 0; 
         }
         
-        /* 'margin: 0 auto' centers blocks horizontally without moving them down */
+        /* 'margin: 0 auto' centers blocks horizontally */
         #hud {
             width: 720px; 
-            margin: 0 auto 5px auto; /* Center horizontally, 5px bottom margin */
+            margin: 0 auto 5px auto; 
             display: flex;
             justify-content: space-between;
             font-weight: bold;
@@ -32,9 +37,9 @@
         }
 
         #gameContainer {
-            width: 720px; /* Explicit width needed for margin: auto to work */
+            width: 720px; 
             height: 540px;
-            margin: 0 auto; /* Center the black box horizontally */
+            margin: 0 auto; 
             position: relative;
             border: 4px solid #444;
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
@@ -49,7 +54,7 @@
         .controls-info {
             background: #333; 
             padding: 10px; 
-            margin: 10px auto 0 auto; /* Center horizontally, 10px top margin */
+            margin: 10px auto 0 auto; 
             font-size: 0.8em; 
             text-align: center; 
             width: 720px; 
@@ -75,19 +80,21 @@
 </head>
 <body>
 
-    <div id="hud">
-        <div id="p1Stats">Space Bucks: $0.00<br>Lives: 25</div>
-        <div id="gameTitle" style="color:#ff0055; font-size: 24px;">GALAGO</div>
-        <div id="p2Stats" style="text-align: right;">Space Bucks: $0.00<br>Lives: 25</div>
-    </div>
+    <div id="content-wrapper">
+        <div id="hud">
+            <div id="p1Stats">Space Bucks: $0.00<br>Lives: 25</div>
+            <div id="gameTitle" style="color:#ff0055; font-size: 24px;">GALAGO</div>
+            <div id="p2Stats" style="text-align: right;">Space Bucks: $0.00<br>Lives: 25</div>
+        </div>
 
-    <div id="gameContainer">
-        <canvas id="gameCanvas" width="720" height="540" tabindex="1"></canvas>
-    </div>
+        <div id="gameContainer">
+            <canvas id="gameCanvas" width="720" height="540" tabindex="1"></canvas>
+        </div>
 
-    <div class="controls-info">
-        <strong>P1:</strong> Arrows Move, CTRL/SHIFT Shoot <br>
-        <strong>P2:</strong> Stick Move, 'A' Shoot
+        <div class="controls-info">
+            <strong>P1:</strong> Arrows Move, CTRL/SHIFT Shoot <br>
+            <strong>P2:</strong> Stick Move, 'A' Shoot
+        </div>
     </div>
 
     <input type="file" id="hiddenFileInput" style="display: none;" accept=".txt">
@@ -99,7 +106,6 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// DIMENSIONS (10% Smaller)
 const WIDTH = 720; 
 const HEIGHT = 540;
 
@@ -123,7 +129,7 @@ let enemyConfig = {
     shipsPerMin: 150, 
     chargers: { emojis: [], speed: 1.5, weight: 10 }, 
     shooters: { emojis: [], speed: 0.8, weight: 84 }, 
-    fatties: { emojis: [], speed: 0.5, weight: 1 },
+    fatties: { emojis: [], speed: 0.5, weight: 1 }, 
     buggers: { emojis: [], speed: 0.65, weight: 5 }
 };
 
@@ -201,8 +207,32 @@ function generateSprite(type) {
     } else if (type === 'enemy_bullet') {
         colors=['#ffaa00']; pattern=["0110","1111","1111","0110"]; w=16; h=16;
     }
+    
+    // --- CENTER ALIGNMENT FIX (UPDATED) ---
     c.width = w; c.height = h;
-    for(let r=0; r < pattern.length; r++){ for(let col=0; col < pattern[r].length; col++){ const colorIndex = parseInt(pattern[r][col]); if(colorIndex > 0){ x.fillStyle = colors[colorIndex - 1]; x.fillRect(col*scale, r*scale, scale, scale); }}}
+    let offsetX = 0;
+    
+    if (pattern.length > 0) {
+        // Calculate the actual visual width of the sprite
+        // Pattern string length * pixel scale (usually 4)
+        const visualWidth = pattern[0].length * scale;
+        
+        // Calculate empty space: (Container Width - Visual Width)
+        // Divide by 2 to split the empty space evenly on left and right
+        offsetX = Math.floor((w - visualWidth) / 2);
+    }
+    // -------------------------------------
+
+    for(let r=0; r < pattern.length; r++){ 
+        for(let col=0; col < pattern[r].length; col++){ 
+            const colorIndex = parseInt(pattern[r][col]); 
+            if(colorIndex > 0){ 
+                x.fillStyle = colors[colorIndex - 1]; 
+                // Add the offsetX to the column position
+                x.fillRect((col*scale) + offsetX, r*scale, scale, scale); 
+            }
+        }
+    }
     return c;
 }
 
@@ -214,10 +244,9 @@ const assets = {
 };
 
 // --- 4. ENTITIES ---
-// Spawn coords adjusted for 720x540
 const players = [ 
-    { x: 180, y: 470, w: 64, h: 64, lives: 25, cd: 0, dead: false }, 
-    { x: 540, y: 470, w: 64, h: 64, lives: 25, cd: 0, dead: false } 
+    { x: 180, y: 470, startY: 470, w: 64, h: 64, lives: 25, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0 }, 
+    { x: 540, y: 470, startY: 470, w: 64, h: 64, lives: 25, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0 } 
 ];
 const pBullets = [], eBullets = [], enemies = [], particles = [];
 
@@ -360,6 +389,21 @@ function spawnEnemy() {
     enemies.push(e);
 }
 
+// Helper: Handle Damage & State
+function handlePlayerHit(p) {
+    if (p.state !== 'active' || p.shieldTimer > 0) return; // Invulnerable
+    p.lives--;
+    createExplosion(p.x+p.w/2, p.y+p.h/2, '#ffaa00', 2.0); 
+    sfx.explosion('fatty');
+    
+    if (p.lives <= 0) {
+        p.dead = true;
+    } else {
+        p.state = 'respawning';
+        p.respawnTimer = 3000; // 3 seconds delay
+    }
+}
+
 function update(dt) {
     if(showStars) updateStars(dt);
     if(!gameStarted || gameOver) return;
@@ -376,6 +420,32 @@ function update(dt) {
     // Players
     players.forEach((p, i) => {
         if(p.dead) return;
+
+        // 1. Respawn Delay
+        if (p.state === 'respawning') {
+            p.respawnTimer -= dt;
+            if(p.respawnTimer <= 0) {
+                p.state = 'entering';
+                p.x = (i===0) ? 180 : 540; // Reset X
+                p.y = HEIGHT + 64; // Start below screen
+            }
+            return;
+        }
+
+        // 2. Fly In
+        if (p.state === 'entering') {
+            p.y -= 0.3 * dt;
+            if (p.y <= p.startY) {
+                p.y = p.startY;
+                p.state = 'active';
+                p.shieldTimer = 3000; // 3 seconds shield
+            }
+            return;
+        }
+
+        if (p.shieldTimer > 0) p.shieldTimer -= dt;
+
+        // 3. Active Control
         if(i===0) {
             if(keys['ArrowLeft']) p.x -= 0.4 * dt; if(keys['ArrowRight']) p.x += 0.4 * dt;
             if((keys['ControlLeft']||keys['ShiftLeft']||keys['KeyQ']) && p.cd <= 0) { 
@@ -403,7 +473,33 @@ function update(dt) {
         // --- FATTY ---
         else if(e.type === 'fatty') { 
             e.y += 0.04 * e.speedMult * dt; 
-            if(Math.random() < 0.01) { eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, type: 'rocket', vx: 0, vy: 0.3*dt}); sfx.enemyShoot(true); } 
+            if(Math.random() < 0.01) { 
+                // === CHANGED CODE HERE: FATTY TARGETING ===
+                // Find closest active player
+                let target = null;
+                let minDist = 99999;
+                players.forEach(p => {
+                    if(!p.dead && p.state === 'active') {
+                        let dist = Math.hypot(p.x - e.x, p.y - e.y);
+                        if(dist < minDist) { minDist = dist; target = p; }
+                    }
+                });
+
+                // Default velocity (straight down) if no player found
+                let vx = 0; 
+                let vy = 0.3 * dt;
+
+                // Aim directly at player if found
+                if(target) {
+                    let angle = Math.atan2(target.y - e.y, target.x - e.x);
+                    vx = Math.cos(angle) * 0.3 * dt;
+                    vy = Math.sin(angle) * 0.3 * dt;
+                }
+
+                eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, type: 'rocket', vx: vx, vy: vy}); 
+                sfx.enemyShoot(true); 
+                // ==========================
+            } 
         }
         // --- SHOOTER ---
         else if(e.type === 'shooter') {
@@ -411,7 +507,7 @@ function update(dt) {
             if(e.state === 'entering') { e.y += 0.2 * e.speedMult * dt; e.x += (targetX - e.x) * 0.05; if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; } }
             else { e.y = targetY; e.x = targetX; if(Math.random() < 0.002) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: 0, vy: 0.4*dt}); sfx.enemyShoot(false); } }
         }
-        // --- BUGGER (Fixed) ---
+        // --- BUGGER ---
         else if (e.type === 'bugger') {
             if (e.state === 'moving') {
                 e.angle += 0.003 * dt;
@@ -471,11 +567,10 @@ function update(dt) {
         // Crash
         if (e.type === 'charger') {
             players.forEach(p => {
-                if(!p.dead && rectIntersect(p, e)) {
-                    p.lives--;
-                    createExplosion(e.x+e.w/2, e.y+e.h/2, '#ffaa00', 2.0); 
-                    sfx.explosion('fatty'); enemies.splice(i, 1);
-                    if(p.lives <= 0) p.dead = true;
+                if(!p.dead && p.state === 'active' && rectIntersect(p, e)) {
+                    handlePlayerHit(p);
+                    // Only kill the enemy if it actually hit an active player
+                    if(p.state === 'respawning') enemies.splice(i, 1);
                 }
             });
         }
@@ -503,7 +598,14 @@ function update(dt) {
         if(b.y > HEIGHT || b.x < 0 || b.x > WIDTH) eBullets.splice(i, 1);
     }
 
-    eBullets.forEach((b, bIdx) => { players.forEach(p => { if(!p.dead && rectIntersect(p, b)) { p.lives--; eBullets.splice(bIdx, 1); sfx.explosion('charger'); createExplosion(p.x+32, p.y+32, '#fff'); if(p.lives <= 0) p.dead = true; }}); });
+    eBullets.forEach((b, bIdx) => { 
+        players.forEach(p => { 
+            if(!p.dead && p.state === 'active' && rectIntersect(p, b)) { 
+                handlePlayerHit(p);
+                eBullets.splice(bIdx, 1); 
+            }
+        }); 
+    });
 }
 function updateBullets(arr, spd, dt) { for(let i=arr.length-1; i>=0; i--) { arr[i].y += spd * dt; if(arr[i].y < -20 || arr[i].y > HEIGHT+20) arr.splice(i, 1); }}
 
@@ -542,7 +644,26 @@ function draw() {
     if(gameOver) { ctx.fillStyle = "red"; ctx.font = "50px Courier New"; ctx.textAlign = "center"; ctx.fillText("GAME OVER", WIDTH/2, HEIGHT/2); return; }
 
     particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1.0; });
-    players.forEach((p, i) => { if(!p.dead) ctx.drawImage(assets['p'+(i+1)], p.x, p.y, p.w, p.h); });
+    
+    // Draw Players (Only if not respawning)
+    players.forEach((p, i) => { 
+        if(!p.dead && p.state !== 'respawning') {
+            // Draw Shield Ring
+            if(p.shieldTimer > 0) {
+                ctx.save();
+                ctx.strokeStyle = '#00ffff';
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#00ffff';
+                ctx.beginPath();
+                ctx.arc(p.x + p.w/2, p.y + p.h/2, 40, 0, Math.PI*2);
+                ctx.stroke();
+                ctx.restore();
+            }
+            // Draw Ship
+            ctx.drawImage(assets['p'+(i+1)], p.x, p.y, p.w, p.h); 
+        }
+    });
     
     enemies.forEach(e => {
         if (e.type === 'bugger') {
