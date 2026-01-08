@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>tgheaioteha v93</title>
+    <title>reboot for config check v95</title>
     <style>body { font-family: monospace; padding: 20px; }</style>
 </head>
 <body>
@@ -532,7 +532,8 @@ function parseConfigText(text) {
 }
 
 window.addEventListener('load', () => {
-    fetch('config.txt').then(res => { if(!res.ok) throw new Error("No config"); return res.text(); }).then(text => parseConfigText(text)).catch(e => console.log("No default config.txt found."));
+    // MODIFIED: Added timestamp to prevent caching on GitHub
+    fetch('config.txt?t=' + Date.now()).then(res => { if(!res.ok) throw new Error("No config"); return res.text(); }).then(text => parseConfigText(text)).catch(e => console.log("No default config.txt found."));
     const imgs = ['p1.png', 'p2.png', 'Ship1.png', 'Ship2.png', 'ship1.png', 'ship2.png', 'enemy.png'];
     imgs.forEach(name => {
         const i = new Image(); i.src = name;
