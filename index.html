@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>reboot for config check v95</title>
+    <title>make config lower case btich v110</title>
     <style>body { font-family: monospace; padding: 20px; }</style>
 </head>
 <body>
@@ -10,9 +10,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GALAGO v78</title>
+    <title>GALAGO v79</title>
     <style>
-        /* --- GLOBAL RESET to fix 10px padding issue --- */
+        /* --- GLOBAL RESET --- */
         html, body {
             margin: 0;
             padding: 0;
@@ -30,10 +30,20 @@
             background-color: #1a1a2e;
             color: #fff;
             font-family: 'Courier New', Courier, monospace;
-            display: block; 
-            overflow: auto; 
-            text-align: center;
-            padding-top: 20px; /* Only top padding */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: auto;
+            padding: 20px 0;
+        }
+        
+        #content-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
         }
         
         #hud {
@@ -53,7 +63,7 @@
             align-items: flex-end; 
             margin: 0 auto;
             width: fit-content;
-            gap: 10px; /* Replaces manual margins for cleaner layout */
+            gap: 0px;
         }
 
         #gameContainer {
@@ -221,7 +231,7 @@
         <div id="hud">
             <div id="p1Stats">Reactor Power: 0%<br>Lives: 25</div>
             <div style="display:flex; flex-direction:column; align-items:center;">
-                <div id="gameTitle" style="color:#ff0055; font-size: 24px;">GALAGO</div>
+                <div id="gameTitle" style="color:#ff0055; font-size: 24px; font-weight: bold;">MATH NUKE</div>
                 <div id="levelIndicator" style="color: #ffff00; font-size: 20px; font-weight: bold; margin-top: 4px;">LEVEL 1</div>
             </div>
             <div id="p2Stats" style="text-align: right;">Reactor Power: 0%<br>Lives: 25</div>
@@ -277,18 +287,7 @@
     <div id="toast">Config Loaded!</div>
 
 <script>
-// --- LAYOUT MANAGER ---
-function alignGameBottom() {
-    const wrapper = document.getElementById('content-wrapper');
-    if (!wrapper) return;
-    const windowHeight = window.innerHeight;
-    const contentHeight = wrapper.offsetHeight;
-    let requiredTopMargin = windowHeight - contentHeight - 40;
-    if (requiredTopMargin < 0) requiredTopMargin = 0;
-    wrapper.style.marginTop = requiredTopMargin + 'px';
-}
-window.addEventListener('load', alignGameBottom);
-window.addEventListener('resize', alignGameBottom);
+// Layout manager removed - using CSS flexbox centering instead
 
 // --- 1. SETUP CONSTANTS & STATE ---
 const canvas = document.getElementById('gameCanvas');
@@ -417,7 +416,7 @@ const players = [
     { x: 540, y: 470, startY: 470, w: 64, h: 64, lives: 25, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 0, hasNuclearWeapon: false } 
 ];
 const pBullets = [], eBullets = [], enemies = [], particles = [], capsules = [], activeNukes = [];
-const rockets = []; // Track active rockets
+const rockets = [];
 
 const SWARM = { xOffset: 0, yBase: HEIGHT * 0.15, dir: 1, dropTimer: 0, slots: [], cols: 10, rows: 4, lastLowestRow: -1 };
 for(let i=0; i < SWARM.cols * SWARM.rows; i++) SWARM.slots.push(false);
@@ -525,6 +524,13 @@ function parseConfigText(text) {
     eventTimeline.sort((a,b) => a.time - b.time);
     showToast(`Config Loaded! (${levelTimeline.length} Levels, ${eventTimeline.length} Events)`);
     
+    const btn = document.getElementById('customBtn');
+    if (btn) {
+        btn.style.backgroundColor = '#111';
+        btn.style.color = '#444';
+        btn.style.borderColor = '#222';
+    }
+    
     if (!gameStarted && levelTimeline.length > 0) {
         const startLvl = levelTimeline.find(lvl => lvl.time === 0);
         if(startLvl) { enemyConfig = startLvl.config; currentLevelName = startLvl.name; document.getElementById('levelIndicator').innerText = currentLevelName; }
@@ -532,8 +538,28 @@ function parseConfigText(text) {
 }
 
 window.addEventListener('load', () => {
-    // MODIFIED: Added timestamp to prevent caching on GitHub
-    fetch('config.txt?t=' + Date.now()).then(res => { if(!res.ok) throw new Error("No config"); return res.text(); }).then(text => parseConfigText(text)).catch(e => console.log("No default config.txt found."));
+    // Initialize HUD text immediately
+    document.getElementById('p1Stats').innerHTML = 'Reactor Power: 0%<br>Lives: 25';
+    document.getElementById('p2Stats').innerHTML = 'Reactor Power: 0%<br>Lives: 25';
+    document.getElementById('gameTitle').textContent = 'MATH NUKE';
+    document.getElementById('levelIndicator').textContent = 'LEVEL 1';
+    
+    // Try to load config.txt with better error handling
+    fetch('config.txt?t=' + Date.now())
+        .then(res => { 
+            console.log('Config fetch status:', res.status, res.ok);
+            if(!res.ok) throw new Error("Config not found - status: " + res.status); 
+            return res.text(); 
+        })
+        .then(text => {
+            console.log('Config loaded, length:', text.length);
+            parseConfigText(text);
+        })
+        .catch(e => {
+            console.log("Config loading failed:", e.message);
+            console.log("You can still load config manually with the button");
+        });
+    
     const imgs = ['p1.png', 'p2.png', 'Ship1.png', 'Ship2.png', 'ship1.png', 'ship2.png', 'enemy.png'];
     imgs.forEach(name => {
         const i = new Image(); i.src = name;
@@ -651,7 +677,6 @@ function updateNukeDisplay() {
     }
 }
 
-// --- WEAPON SELECTION LOGIC ---
 function checkPowerLevels() {
     if (gameOver) return;
 
@@ -678,7 +703,6 @@ window.selectWeapon = function(playerIndex, weaponId) {
     let n2 = Math.floor(Math.random() * 5) + 1;
     
     let textLines = ["Your ship requires a calculation to", "install your new weapon system upgrade."];
-    // NEW WEAPON: Weapon 3 (Nuclear Bomb)
     if (weaponId === 3) { textLines = ["Nuclear launch codes required...", "Confirm authorization protocol."]; }
     else if (weaponId === 2) { textLines = ["Your engineering crew can't figure out", "how to install your rockets.", "Help them with the math."]; }
 
@@ -692,7 +716,7 @@ function finalizeUpgrade(success) {
         let weaponName = "Weapon " + wId;
         if (wId === 1) { players[pIdx].weaponLevel = 2; weaponName = "Blaster x 2"; } 
         else if (wId === 2) { players[pIdx].hasRockets = true; weaponName = "Quad-Rockets"; }
-        else if (wId === 3) { players[pIdx].hasNuclearWeapon = true; weaponName = "Nuclear Bomb System"; } // Unlock nuke capability
+        else if (wId === 3) { players[pIdx].hasNuclearWeapon = true; weaponName = "Nuclear Bomb System"; }
 
         showToast((pIdx===0?"P1":"P2") + " Equipped " + weaponName);
         if(pIdx === 0) { p1Power = 0; p1Selecting = false; document.getElementById('p1-bar-container').classList.remove('static-active'); }
@@ -834,12 +858,72 @@ function update(dt) {
         if(e.y > HEIGHT) { if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; enemies.splice(i, 1); }
     }
 
+    for(let i=enemies.length-1; i>=0; i--) {
+        let e = enemies[i];
+        if(e.flashTimer > 0) e.flashTimer--;
+        for(let bIdx=pBullets.length-1; bIdx>=0; bIdx--) {
+            let b = pBullets[bIdx];
+            if(rectIntersect(e, b)) { 
+                e.hp--; 
+                pBullets.splice(bIdx, 1); 
+                if(e.hp > 0) { 
+                    e.flashTimer = 5; 
+                } else { 
+                    if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; 
+                    let configName = e.type + 's'; 
+                    if(e.type === 'fatty') configName = 'fatties'; 
+                    let chance = (enemyConfig[configName] && enemyConfig[configName].dropChance) || 0; 
+                    if (Math.random() < chance) capsules.push({ x: e.x + e.w/2 - 8, y: e.y, w: 16, h: 24, type: 'energy' }); 
+                    let nukeChance = (enemyConfig[configName] && enemyConfig[configName].nukeChance) || 0; 
+                    if (Math.random() < nukeChance) capsules.push({ x: e.x + e.w/2 - 16, y: e.y, w: 32, h: 32, type: 'nuke' }); 
+                    createExplosion(e.x+e.w/2, e.y+e.h/2, e.color); 
+                    sfx.explosion(e.type); 
+                    enemies.splice(i, 1); 
+                } 
+                break; 
+            }
+        }
+        if (e.type === 'charger') { 
+            players.forEach(p => { 
+                if(!p.dead && p.state === 'active' && rectIntersect(p, e)) { 
+                    handlePlayerHit(p); 
+                    if(p.state === 'respawning') enemies.splice(i, 1); 
+                } 
+            }); 
+        }
+        if(e.y > HEIGHT) { 
+            if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; 
+            enemies.splice(i, 1); 
+        }
+    }
+
     for(let i=capsules.length-1; i>=0; i--) {
-        let c = capsules[i]; c.y += (BASE_CAPSULE_SPEED * enemyConfig.energyCapsuleSpeed) * dt; let collected = false;
+        let c = capsules[i]; 
+        c.y += (BASE_CAPSULE_SPEED * enemyConfig.energyCapsuleSpeed) * dt; 
+        let collected = false;
         for(let pIdx=0; pIdx<players.length; pIdx++) {
             let p = players[pIdx];
             if(!p.dead && p.state === 'active' && rectIntersect(p, c)) {
-                if (c.type === 'energy') { let val = Math.floor(Math.random() * 11) + 10; if(pIdx === 0) p1Power += val; else p2Power += val; if(p1Power > 100) p1Power = 100; if(p2Power > 100) p2Power = 100; showFloatingText(pIdx, val + '%'); sfx.explosion('capsule'); } else if (c.type === 'nuke') { if (players[pIdx].nukes < 3) { players[pIdx].nukes++; showFloatingText(pIdx, "NUKE!"); } else { showFloatingText(pIdx, "FULL!"); } sfx.explosion('capsule'); } capsules.splice(i, 1); collected = true; break;
+                if (c.type === 'energy') { 
+                    let val = Math.floor(Math.random() * 11) + 10; 
+                    if(pIdx === 0) p1Power += val; 
+                    else p2Power += val; 
+                    if(p1Power > 100) p1Power = 100; 
+                    if(p2Power > 100) p2Power = 100; 
+                    showFloatingText(pIdx, val + '%'); 
+                    sfx.explosion('capsule'); 
+                } else if (c.type === 'nuke') { 
+                    if (players[pIdx].nukes < 3) { 
+                        players[pIdx].nukes++; 
+                        showFloatingText(pIdx, "NUKE!"); 
+                    } else { 
+                        showFloatingText(pIdx, "FULL!"); 
+                    } 
+                    sfx.explosion('capsule'); 
+                } 
+                capsules.splice(i, 1); 
+                collected = true; 
+                break;
             }
         }
         if(!collected && c.y > HEIGHT) capsules.splice(i, 1);
@@ -870,7 +954,11 @@ function draw() {
     if(showTimer) { ctx.save(); ctx.fillStyle = "#ff0"; ctx.font = "24px Courier New"; ctx.textAlign = "left"; ctx.fillText(formatTimer(gameTime), 10, 30); ctx.restore(); }
     if(levelMessageTimer > 0) { ctx.save(); ctx.fillStyle = "#0f0"; ctx.font = "bold 60px Courier New"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.shadowColor = "#000"; ctx.shadowBlur = 10; ctx.fillText(levelMessage, WIDTH/2, HEIGHT/2); ctx.restore(); }
     if(mathChallenge.active) { drawMathChallenge(); } else if(gamePaused || selectionPaused) { ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(0,0,WIDTH,HEIGHT); ctx.fillStyle = "#fff"; ctx.font = "40px Courier New"; ctx.textAlign = "center"; if (selectionPaused) { ctx.fillStyle = "#00ffff"; ctx.fillText("WEAPON SELECTION", WIDTH/2, HEIGHT/2); } else { ctx.fillText("PAUSED", WIDTH/2, HEIGHT/2); } ctx.restore(); }
-    document.getElementById('p1Stats').innerHTML = `Reactor Power: ${Math.floor(p1Power)}%<br>Lives: ${players[0].lives}`; document.getElementById('p2Stats').innerHTML = `Reactor Power: ${Math.floor(p2Power)}%<br>Lives: ${players[1].lives}`;
+    
+    // Update HUD with labels intact
+    document.getElementById('p1Stats').innerHTML = `Reactor Power: ${Math.floor(p1Power)}%<br>Lives: ${players[0].lives}`; 
+    document.getElementById('p2Stats').innerHTML = `Reactor Power: ${Math.floor(p2Power)}%<br>Lives: ${players[1].lives}`;
+    document.getElementById('gameTitle').textContent = 'MATH NUKE';
 }
 
 window.addEventListener('keydown', e => { 
@@ -889,7 +977,6 @@ window.addEventListener('keyup', e => keys[e.code] = false);
 window.addEventListener("gamepadconnected", e => gamepadIndex = e.gamepad.index);
 function loop(t) { let dt = t - lastTime; if(dt>100) dt=100; lastTime = t; update(dt); draw(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
-alignGameBottom();
 </script>
 </body>
 </html></pre>
