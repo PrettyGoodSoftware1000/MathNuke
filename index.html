@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GALAGO v79</title>
+    <title>MATH NUKE</title>
     <style>
         /* --- GLOBAL RESET --- */
         html, body {
@@ -271,7 +271,7 @@
             <div id="p2-nukes" class="nuke-slot" style="justify-content: flex-end;"></div>
         </div>
 
-        <div class="controls-info"><strong>P1:</strong> Arrows/Shift/Z(Rockets)/X(Nuke) | <strong>P2:</strong> Stick/A | <strong>O/W</strong> Fill Power | <strong>T</strong> Timer | <strong>P</strong> Pause</div>
+        <div class="controls-info"><strong>P1:</strong> Arrows/Shift/Z(Rockets)/X(Nuke) | <strong>P2:</strong> Stick/A | <strong>G</strong> Ship Select | <strong>O/W</strong> Fill Power | <strong>T</strong> Timer | <strong>P</strong> Pause</div>
     </div>
 
     <input type="file" id="hiddenFileInput" style="display: none;" accept=".txt">
@@ -293,6 +293,9 @@ let selectionPaused = false;
 let gameOver = false;
 let animFrame = 0;
 let showStars = false;
+let shipSelectionActive = false;
+let p1SelectedShip = 'arwing';
+let p2SelectedShip = 'bomber';
 
 // --- MATH CHALLENGE STATE ---
 let mathChallenge = {
@@ -348,57 +351,223 @@ function generateSprite(type) {
     let scale = 4, w=32, h=32, colors=[], pattern=[];
 
     if(type.includes('p1')) {
-        // Rebel X-Wing style - Orange, White, Red
-        w=64; h=64; 
-        colors=['#ff6600','#ffffff','#cc0000','#888888'];
-        pattern = [
-            "00000000330000000000",
-            "00000000333000000000",
-            "00000002333200000000",
-            "00000022333220000000",
-            "00000223333222000000",
-            "00002233333322200000",
-            "00022333333332220000",
-            "00223333113332220000",
-            "02233331111333322200",
-            "22331111111111133220",
-            "23311111111111111320",
-            "33111111111111111130",
-            "33111111444111111130",
-            "33111111444111111130",
-            "33111111111111111130",
-            "23311111111111111320",
-            "22331111111111133220",
-            "02233331111333322200",
-            "00223333113332220000",
-            "00022333333332220000"
-        ];
+        // Choose design: 'xwing', 'arwing', 'stealth', 'viper'
+        let design = p1SelectedShip; // Uses selected ship
+        
+        if(design === 'xwing') {
+            // Original Rebel X-Wing style
+            w=64; h=64; 
+            colors=['#ff6600','#ffffff','#cc0000','#888888'];
+            pattern = [
+                "00000000330000000000",
+                "00000000333000000000",
+                "00000002333200000000",
+                "00000022333220000000",
+                "00000223333222000000",
+                "00002233333322200000",
+                "00022333333332220000",
+                "00223333113332220000",
+                "02233331111333322200",
+                "22331111111111133220",
+                "23311111111111111320",
+                "33111111111111111130",
+                "33111111444111111130",
+                "33111111444111111130",
+                "33111111111111111130",
+                "23311111111111111320",
+                "22331111111111133220",
+                "02233331111333322200",
+                "00223333113332220000",
+                "00022333333332220000"
+            ];
+        } else if(design === 'arwing') {
+            // Design 1: Blue vertical fins, sleek grey body, yellow tips
+            w=64; h=64;
+            colors=['#4169e1','#c0c0c0','#ffff00','#ff0000','#1e3a8a'];
+            pattern = [
+                "00000000022000000000",
+                "00000000222200000000",
+                "00000001222210000000",
+                "00000012222221000000",
+                "00000122222222100000",
+                "00001222255222210000",
+                "00012222555522221000",
+                "00122225555552222100",
+                "01222255555555222210",
+                "12222555555555522221",
+                "12225555444455552221",
+                "12255554444445552221",
+                "12255544444444552221",
+                "12255544333344552221",
+                "02255543333345522210",
+                "00225543333345522100",
+                "00022543333345221000",
+                "00002243333342210000",
+                "00000223333322100000",
+                "00000022222221000000"
+            ];
+        } else if(design === 'stealth') {
+            // Design 3: White/grey angular stealth with cyan accents
+            w=64; h=64;
+            colors=['#ffffff','#c0c0c0','#00ffff','#ffff00','#808080'];
+            pattern = [
+                "00000000011000000000",
+                "00000000111100000000",
+                "00000001111110000000",
+                "00000011122111000000",
+                "00000111222211100000",
+                "00001112222221110000",
+                "00011122233222211000",
+                "00111222333322221100",
+                "01112223333332222110",
+                "11122233333333222211",
+                "11222333355333322211",
+                "11223335555533322211",
+                "11223355544553322211",
+                "11223355555533322211",
+                "01223335555533322110",
+                "00223333555333221100",
+                "00122333333332211000",
+                "00011223333222110000",
+                "00000112222211100000",
+                "00000011111111000000"
+            ];
+        } else if(design === 'viper') {
+            // Design 4: Wide wings with magenta accents
+            w=64; h=64;
+            colors=['#808080','#ff1493','#404040','#00ffff'];
+            pattern = [
+                "00000000011000000000",
+                "00000000111100000000",
+                "00000001133110000000",
+                "00000011333311000000",
+                "00000113333331100000",
+                "00001133322333110000",
+                "00011333222233311000",
+                "00113332222223331100",
+                "01133322222222233110",
+                "11333222244222233311",
+                "11332224444422233311",
+                "11322244444444223311",
+                "11322244444444223311",
+                "01322244444444223110",
+                "00322244444444221100",
+                "00132224444422311000",
+                "00013222444223110000",
+                "00001322222331100000",
+                "00000132223311000000",
+                "00000013333110000000"
+            ];
+        }
     } else if (type.includes('p2')) {
-        // Imperial TIE Fighter style - Grey, Dark Grey, Green
-        w=64; h=64; 
-        colors=['#333333','#666666','#00ff00','#1a1a1a'];
-        pattern = [
-            "00000002222000000000",
-            "00000022222200000000",
-            "00000222222220000000",
-            "00002222222222200000",
-            "00022222222222220000",
-            "00222222222222222000",
-            "02222224444222222200",
-            "22222244444422222220",
-            "22222441111442222220",
-            "22224411111144222220",
-            "22224113331144222220",
-            "22224113331144222220",
-            "22224113331144222220",
-            "22224411111144222220",
-            "22222441111442222220",
-            "22222244444422222220",
-            "02222224444222222200",
-            "00222222222222222000",
-            "00022222222222220000",
-            "00002222222222200000"
-        ];
+        // Choose design: 'tie', 'bomber', 'interceptor', 'defender'
+        let design = p2SelectedShip; // Uses selected ship
+        
+        if(design === 'tie') {
+            // Original Imperial TIE Fighter
+            w=64; h=64; 
+            colors=['#333333','#666666','#00ff00','#1a1a1a'];
+            pattern = [
+                "00000002222000000000",
+                "00000022222200000000",
+                "00000222222220000000",
+                "00002222222222200000",
+                "00022222222222220000",
+                "00222222222222222000",
+                "02222224444222222200",
+                "22222244444422222220",
+                "22222441111442222220",
+                "22224411111144222220",
+                "22224113331144222220",
+                "22224113331144222220",
+                "22224113331144222220",
+                "22224411111144222220",
+                "22222441111442222220",
+                "22222244444422222220",
+                "02222224444222222200",
+                "00222222222222222000",
+                "00022222222222220000",
+                "00002222222222200000"
+            ];
+        } else if(design === 'bomber') {
+            // Design 2: Green industrial bomber with cylindrical engines
+            w=64; h=64;
+            colors=['#228b22','#c0c0c0','#404040','#1a1a1a','#4169e1'];
+            pattern = [
+                "00000000022000000000",
+                "00000000222200000000",
+                "00000001222210000000",
+                "00000012222221000000",
+                "00000122222222100000",
+                "00001222233222210000",
+                "00012223443342221000",
+                "00122234443444322100",
+                "01222344434443443210",
+                "12223444344434444321",
+                "12234443333334444321",
+                "12234433333333444321",
+                "12234433355333444321",
+                "12234433333333444321",
+                "01234443333334443210",
+                "00123444333334432100",
+                "00012344433444321000",
+                "00001234443442210000",
+                "00000122344422100000",
+                "00000012222221000000"
+            ];
+        } else if(design === 'interceptor') {
+            // Fast, sleek interceptor with red accents
+            w=64; h=64;
+            colors=['#1a1a1a','#666666','#ff0000','#808080'];
+            pattern = [
+                "00000000011000000000",
+                "00000000111100000000",
+                "00000001122110000000",
+                "00000011222211000000",
+                "00000112222221100000",
+                "00001122233222110000",
+                "00011222333322211000",
+                "00112223333332221100",
+                "01122233333333222110",
+                "11222333333333322211",
+                "11223333344333322211",
+                "11223334444433322211",
+                "11223334444433322211",
+                "11223334444433322211",
+                "01223333444333222110",
+                "00223333333332221100",
+                "00122333333322211000",
+                "00011223333222110000",
+                "00001122222221100000",
+                "00000011111111000000"
+            ];
+        } else if(design === 'defender') {
+            // Heavy defender with cyan highlights
+            w=64; h=64;
+            colors=['#2f4f4f','#708090','#00ffff','#1a1a1a'];
+            pattern = [
+                "00000000022000000000",
+                "00000000222200000000",
+                "00000001222210000000",
+                "00000012222221000000",
+                "00000122222222100000",
+                "00001222233222210000",
+                "00012222333322221000",
+                "00122223333332222100",
+                "01222233333333222210",
+                "12222333333333322221",
+                "12223333344333322221",
+                "12223334444433322221",
+                "12223344444443322221",
+                "12223344444443322221",
+                "01223334444433222210",
+                "00223333444333222100",
+                "00122333333332221000",
+                "00011223333222210000",
+                "00001122222222100000",
+                "00000011111111000000"
+            ];
+        }
     } else if (type === 'charger') {
         colors=['#ff0055']; pattern = ["10000001","11000011","11100111","01111110","00111100","00011000","00111100","01000010"];
     } else if (type === 'shooter') {
@@ -851,6 +1020,91 @@ function drawMathChallenge() {
     ctx.restore();
 }
 
+function drawShipSelection() {
+    if (!shipSelectionActive) return;
+    
+    ctx.save();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.95)";
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    
+    ctx.fillStyle = "#00ffff";
+    ctx.font = "bold 32px Courier New";
+    ctx.textAlign = "center";
+    ctx.fillText("SELECT YOUR SHIP - PRESS G TO CLOSE", WIDTH/2, 40);
+    
+    const ships = [
+        { name: 'X-Wing', design: 'xwing', player: 1 },
+        { name: 'Arwing', design: 'arwing', player: 1 },
+        { name: 'Stealth', design: 'stealth', player: 1 },
+        { name: 'Viper', design: 'viper', player: 1 },
+        { name: 'TIE Fighter', design: 'tie', player: 2 },
+        { name: 'Bomber', design: 'bomber', player: 2 },
+        { name: 'Interceptor', design: 'interceptor', player: 2 },
+        { name: 'Defender', design: 'defender', player: 2 }
+    ];
+    
+    const startX = 90;
+    const startY = 100;
+    const spacing = 160;
+    
+    ships.forEach((ship, i) => {
+        const row = Math.floor(i / 4);
+        const col = i % 4;
+        const x = startX + col * spacing;
+        const y = startY + row * 200;
+        
+        // Draw box
+        const isSelected = (ship.player === 1 && p1SelectedShip === ship.design) || 
+                          (ship.player === 2 && p2SelectedShip === ship.design);
+        
+        ctx.strokeStyle = isSelected ? "#00ff00" : "#666";
+        ctx.lineWidth = isSelected ? 4 : 2;
+        ctx.strokeRect(x - 60, y - 10, 120, 140);
+        
+        if (isSelected) {
+            ctx.fillStyle = "rgba(0, 255, 0, 0.1)";
+            ctx.fillRect(x - 60, y - 10, 120, 140);
+        }
+        
+        // Draw ship preview (create temp sprite)
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCanvas.width = 64;
+        tempCanvas.height = 64;
+        
+        // Generate the ship sprite temporarily
+        const oldP1Ship = p1SelectedShip;
+        const oldP2Ship = p2SelectedShip;
+        if (ship.player === 1) p1SelectedShip = ship.design;
+        else p2SelectedShip = ship.design;
+        
+        const sprite = generateSprite('p' + ship.player);
+        
+        p1SelectedShip = oldP1Ship;
+        p2SelectedShip = oldP2Ship;
+        
+        ctx.drawImage(sprite, x - 32, y + 10, 64, 64);
+        
+        // Draw label
+        ctx.fillStyle = "#fff";
+        ctx.font = "14px Courier New";
+        ctx.textAlign = "center";
+        ctx.fillText(ship.name, x, y + 90);
+        
+        ctx.font = "12px Courier New";
+        ctx.fillStyle = ship.player === 1 ? "#ff6600" : "#00ff00";
+        ctx.fillText("P" + ship.player, x, y + 105);
+        
+        // Store click area
+        if (!ship.clickArea) ship.clickArea = { x: x - 60, y: y - 10, w: 120, h: 140 };
+    });
+    
+    // Store ships array for click detection
+    window.shipOptions = ships;
+    
+    ctx.restore();
+}
+
 function update(dt) {
     document.getElementById('p1-fill').style.height = p1Power + '%'; document.getElementById('p2-fill').style.height = p2Power + '%';
     checkPowerLevels(); updateNukeDisplay();
@@ -1164,6 +1418,9 @@ function draw() {
     if(levelMessageTimer > 0) { ctx.save(); ctx.fillStyle = "#0f0"; ctx.font = "bold 60px Courier New"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.shadowColor = "#000"; ctx.shadowBlur = 10; ctx.fillText(levelMessage, WIDTH/2, HEIGHT/2); ctx.restore(); }
     if(mathChallenge.active) { drawMathChallenge(); } else if(gamePaused || selectionPaused) { ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(0,0,WIDTH,HEIGHT); ctx.fillStyle = "#fff"; ctx.font = "40px Courier New"; ctx.textAlign = "center"; if (selectionPaused) { ctx.fillStyle = "#00ffff"; ctx.fillText("WEAPON SELECTION", WIDTH/2, HEIGHT/2); } else { ctx.fillText("PAUSED", WIDTH/2, HEIGHT/2); } ctx.restore(); }
     
+    // Draw ship selection screen
+    if(shipSelectionActive) { drawShipSelection(); }
+    
     // Update HUD with labels intact
     document.getElementById('p1Stats').innerHTML = `Reactor Power: ${Math.floor(p1Power)}%<br>Lives: ${players[0].lives}`; 
     document.getElementById('p2Stats').innerHTML = `Reactor Power: ${Math.floor(p2Power)}%<br>Lives: ${players[1].lives}`;
@@ -1175,6 +1432,14 @@ window.addEventListener('keydown', e => {
     if (mathChallenge.active) {
         if (e.key >= '0' && e.key <= '9') { mathChallenge.answerStr += e.key; } else if (e.key === 'Backspace') { mathChallenge.answerStr = mathChallenge.answerStr.slice(0, -1); } else if (e.key === 'Enter') { let val = parseInt(mathChallenge.answerStr); if (val === mathChallenge.correctAnswer) { mathChallenge.feedback = "Freakin' Sweet!\nThat's Correct!"; setTimeout(() => finalizeUpgrade(true), 500); } else { mathChallenge.feedback = "Uh oh! That wasn't right."; setTimeout(() => finalizeUpgrade(false), 800); } } return; 
     }
+    if(e.key === 'g' || e.code === 'KeyG') { 
+        shipSelectionActive = !shipSelectionActive; 
+        if(shipSelectionActive) {
+            // Regenerate assets with new ship selections when closing
+            assets.p1 = generateSprite('p1');
+            assets.p2 = generateSprite('p2');
+        }
+    }
     if(e.key === 'o' || e.code === 'KeyO') { p1Power = 100; } if(e.key === 'w' || e.code === 'KeyW') { p2Power = 100; }
     if((e.key === 'p' || e.code === 'KeyP') && !selectionPaused) { gamePaused = !gamePaused; } if(e.key === 't' || e.code === 'KeyT') { showTimer = !showTimer; }
     if((e.code==='ArrowLeft'||e.code==='ArrowRight') && !gameStarted) { 
@@ -1184,6 +1449,36 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 window.addEventListener("gamepadconnected", e => gamepadIndex = e.gamepad.index);
+
+// Click handler for ship selection
+canvas.addEventListener('click', (e) => {
+    if (!shipSelectionActive || !window.shipOptions) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
+    
+    window.shipOptions.forEach(ship => {
+        if (!ship.clickArea) return;
+        const area = ship.clickArea;
+        if (clickX >= area.x && clickX <= area.x + area.w &&
+            clickY >= area.y && clickY <= area.y + area.h) {
+            
+            if (ship.player === 1) {
+                p1SelectedShip = ship.design;
+            } else {
+                p2SelectedShip = ship.design;
+            }
+            
+            // Regenerate player sprites
+            assets.p1 = generateSprite('p1');
+            assets.p2 = generateSprite('p2');
+        }
+    });
+});
+
 function loop(t) { let dt = t - lastTime; if(dt>100) dt=100; lastTime = t; update(dt); draw(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
 </script>
