@@ -1,12 +1,4 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>make config lower case btich v110</title>
-    <style>body { font-family: monospace; padding: 20px; }</style>
-</head>
-<body>
-    <pre><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -826,19 +818,84 @@ function update(dt) {
 
     for(let i=rockets.length-1; i>=0; i--) {
         let r = rockets[i]; r.timer += dt;
-        if (r.phase === 'deploy') { r.x += r.vx * dt; if (r.timer > 1000) { r.phase = 'ignite'; } } else { r.vy -= 0.05 * dt; r.y += r.vy * dt; if (Math.random() < 0.5) particles.push({ x: r.x+8, y: r.y+32, vx: (Math.random()-0.5), vy: 2, life: 0.5, color: '#ffaa00', size: 4 }); }
+        
+        if (r.phase === 'deploy') { 
+            r.x += r.vx * dt; 
+            // Don't rotate during deploy phase - stays upright
+            if (r.timer > 1000) { 
+                r.phase = 'homing';
+                if (enemies.length > 0) {
+                    r.target = enemies[Math.floor(Math.random() * enemies.length)];
+                }
+            } 
+        } else if (r.phase === 'homing') {
+            if (r.target && enemies.includes(r.target)) {
+                let dx = (r.target.x + r.target.w/2) - (r.x + r.w/2);
+                let dy = (r.target.y + r.target.h/2) - (r.y + r.h/2);
+                let angle = Math.atan2(dy, dx);
+                let speed = 0.2; // Reduced by 50% from 0.4
+                r.vx = Math.cos(angle) * speed;
+                r.vy = Math.sin(angle) * speed;
+            } else {
+                if (enemies.length > 0) {
+                    r.target = enemies[Math.floor(Math.random() * enemies.length)];
+                } else {
+                    r.vy = -0.15; // Reduced by 50%
+                    r.vx *= 0.95;
+                }
+            }
+            
+            r.x += r.vx * dt;
+            r.y += r.vy * dt;
+            // Only rotate when homing (moving upward)
+            r.rotation = Math.atan2(r.vy, r.vx) + Math.PI / 2;
+            
+            if (Math.random() < 0.5) {
+                particles.push({ x: r.x+8, y: r.y+32, vx: (Math.random()-0.5), vy: 2, life: 0.5, color: '#ffaa00', size: 4 });
+            }
+        } else if (r.phase === 'exploding') {
+            r.explodeTimer -= dt;
+            if (r.explodeTimer <= 0) {
+                createExplosion(r.x, r.y, '#ff0000', 3.0); 
+                sfx.explosion('general');
+                
+                for (let k = enemies.length-1; k >= 0; k--) {
+                    let subE = enemies[k]; 
+                    let dist = Math.hypot((subE.x+subE.w/2) - (r.x+r.w/2), (subE.y+subE.h/2) - (r.y+r.h/2));
+                    if (dist < 100) { 
+                        createExplosion(subE.x+subE.w/2, subE.y+subE.h/2, subE.color); 
+                        if(subE.type === 'shooter' && subE.slotIndex !== -1) SWARM.slots[subE.slotIndex] = false; 
+                        enemies.splice(k, 1);
+                    }
+                }
+                
+                for (let j = 0; j < rockets.length; j++) {
+                    if (j !== i && rockets[j].phase !== 'exploding') {
+                        let rDist = Math.hypot((rockets[j].x + rockets[j].w/2) - (r.x + r.w/2), 
+                                               (rockets[j].y + rockets[j].h/2) - (r.y + r.h/2));
+                        if (rDist < 100) {
+                            rockets[j].phase = 'exploding';
+                            rockets[j].explodeTimer = 100 + Math.random() * 200;
+                        }
+                    }
+                }
+                
+                rockets.splice(i, 1);
+                continue;
+            }
+        }
+        
         let hit = false;
         for (let eIdx = enemies.length-1; eIdx >= 0; eIdx--) {
             let e = enemies[eIdx];
             if (rectIntersect(r, e)) {
-                hit = true; createExplosion(r.x, r.y, '#ff0000', 3.0); sfx.explosion('general');
-                for (let k = enemies.length-1; k >= 0; k--) {
-                    let subE = enemies[k]; let dist = Math.hypot((subE.x+subE.w/2) - (r.x+r.w/2), (subE.y+subE.h/2) - (r.y+r.h/2));
-                    if (dist < 100) { createExplosion(subE.x+subE.w/2, subE.y+subE.h/2, subE.color); if(subE.type === 'shooter' && subE.slotIndex !== -1) SWARM.slots[subE.slotIndex] = false; enemies.splice(k, 1); if (k <= eIdx) eIdx--; }
-                } break; 
+                hit = true;
+                r.phase = 'exploding';
+                r.explodeTimer = 0;
+                break; 
             }
         }
-        if (hit || r.y < -50) rockets.splice(i, 1);
+        if (hit === false && r.y < -50) rockets.splice(i, 1);
     }
     
     for(let i=activeNukes.length-1; i>=0; i--) {
@@ -946,7 +1003,21 @@ function draw() {
     particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1.0; });
     capsules.forEach(c => { ctx.drawImage((c.type==='nuke'?assets.nuke_pickup:assets.capsule), c.x, c.y, c.w, c.h); });
     players.forEach((p, i) => { if(!p.dead && p.state !== 'respawning') { if(p.shieldTimer > 0) { ctx.save(); ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 3; ctx.shadowBlur = 10; ctx.shadowColor = '#00ffff'; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, 40, 0, Math.PI*2); ctx.stroke(); ctx.restore(); } ctx.drawImage(assets['p'+(i+1)], p.x, p.y, p.w, p.h); } });
-    rockets.forEach(r => { ctx.drawImage(assets.rocket, r.x, r.y, r.w, r.h); if (r.phase === 'ignite') { ctx.fillStyle = (animFrame % 2 === 0) ? '#ffaa00' : '#ffff00'; ctx.beginPath(); ctx.moveTo(r.x + 4, r.y + r.h); ctx.lineTo(r.x + r.w - 4, r.y + r.h); ctx.lineTo(r.x + r.w/2, r.y + r.h + 15); ctx.fill(); } });
+    rockets.forEach(r => { 
+        ctx.save();
+        ctx.translate(r.x + r.w/2, r.y + r.h/2);
+        ctx.rotate(r.rotation);
+        ctx.drawImage(assets.rocket, -r.w/2, -r.h/2, r.w, r.h); 
+        if (r.phase === 'homing') { 
+            ctx.fillStyle = (animFrame % 2 === 0) ? '#ffaa00' : '#ffff00'; 
+            ctx.beginPath(); 
+            ctx.moveTo(-4, r.h/2); 
+            ctx.lineTo(4, r.h/2); 
+            ctx.lineTo(0, r.h/2 + 15); 
+            ctx.fill(); 
+        }
+        ctx.restore();
+    });
     activeNukes.forEach(n => { ctx.drawImage(assets.nuke_pickup, n.x, n.y, n.w, n.h); });
     enemies.forEach(e => { if (e.type === 'bugger') { ctx.save(); ctx.translate(e.x + e.w/2, e.y + e.h/2); ctx.rotate(e.rotation); if(e.emoji) { ctx.font = "28px Arial"; ctx.textAlign="center"; ctx.fillText(e.emoji, 0, 10); } else { ctx.drawImage(assets[e.type], -e.w/2, -e.h/2, e.w, e.h); } ctx.restore(); } else { if(e.flashTimer > 0) { ctx.save(); ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = "white"; ctx.fillRect(e.x, e.y, e.w, e.h); ctx.restore(); } else { if(e.emoji) { ctx.font = (e.type==='fatty'?"50px":"28px")+" Arial"; ctx.textAlign="center"; ctx.fillText(e.emoji, e.x+e.w/2, e.y+e.h/1.2); } else { ctx.drawImage(assets[e.type], e.x, e.y, e.w, e.h); } } } });
     ctx.fillStyle = "#ff0"; pBullets.forEach(b => ctx.drawImage(assets.bullet, b.x, b.y, b.w, b.h));
@@ -978,7 +1049,5 @@ window.addEventListener("gamepadconnected", e => gamepadIndex = e.gamepad.index)
 function loop(t) { let dt = t - lastTime; if(dt>100) dt=100; lastTime = t; update(dt); draw(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
 </script>
-</body>
-</html></pre>
 </body>
 </html>
