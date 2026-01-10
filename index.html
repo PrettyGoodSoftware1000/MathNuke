@@ -348,11 +348,57 @@ function generateSprite(type) {
     let scale = 4, w=32, h=32, colors=[], pattern=[];
 
     if(type.includes('p1')) {
-        w=64; h=64; colors=['#ff0000','#ff7700','#ffff00'];
-        pattern = ["00000010000000","00000111000000","00001121100000","00011222110000","00112202211000","01122000221100","11220000022110","12200000002210","12200000002210","11220000022110","01122000221100","00112202211000","00011222110000","00001121100000","00000111000000","00000010000000"];
+        // Rebel X-Wing style - Orange, White, Red
+        w=64; h=64; 
+        colors=['#ff6600','#ffffff','#cc0000','#888888'];
+        pattern = [
+            "00000000330000000000",
+            "00000000333000000000",
+            "00000002333200000000",
+            "00000022333220000000",
+            "00000223333222000000",
+            "00002233333322200000",
+            "00022333333332220000",
+            "00223333113332220000",
+            "02233331111333322200",
+            "22331111111111133220",
+            "23311111111111111320",
+            "33111111111111111130",
+            "33111111444111111130",
+            "33111111444111111130",
+            "33111111111111111130",
+            "23311111111111111320",
+            "22331111111111133220",
+            "02233331111333322200",
+            "00223333113332220000",
+            "00022333333332220000"
+        ];
     } else if (type.includes('p2')) {
-        w=64; h=64; colors=['#0000ff','#00ffff','#add8e6'];
-        pattern = ["00000010000000","00000111000000","00001121100000","00011222110000","00112202211000","01122000221100","11220000022110","12200000002210","12200000002210","11220000022110","01122000221100","00112202211000","00011222110000","00001121100000","00000111000000","00000010000000"].map(s=>s.split('').reverse().join(''));
+        // Imperial TIE Fighter style - Grey, Dark Grey, Green
+        w=64; h=64; 
+        colors=['#333333','#666666','#00ff00','#1a1a1a'];
+        pattern = [
+            "00000002222000000000",
+            "00000022222200000000",
+            "00000222222220000000",
+            "00002222222222200000",
+            "00022222222222220000",
+            "00222222222222222000",
+            "02222224444222222200",
+            "22222244444422222220",
+            "22222441111442222220",
+            "22224411111144222220",
+            "22224113331144222220",
+            "22224113331144222220",
+            "22224113331144222220",
+            "22224411111144222220",
+            "22222441111442222220",
+            "22222244444422222220",
+            "02222224444222222200",
+            "00222222222222222000",
+            "00022222222222220000",
+            "00002222222222200000"
+        ];
     } else if (type === 'charger') {
         colors=['#ff0055']; pattern = ["10000001","11000011","11100111","01111110","00111100","00011000","00111100","01000010"];
     } else if (type === 'shooter') {
@@ -409,6 +455,7 @@ const players = [
 ];
 const pBullets = [], eBullets = [], enemies = [], particles = [], capsules = [], activeNukes = [];
 const rockets = [];
+const shockwaves = []; // For nuke shockwave effects
 
 const SWARM = { xOffset: 0, yBase: HEIGHT * 0.15, dir: 1, dropTimer: 0, slots: [], cols: 10, rows: 4, lastLowestRow: -1 };
 for(let i=0; i < SWARM.cols * SWARM.rows; i++) SWARM.slots.push(false);
@@ -427,6 +474,7 @@ function parseConfigText(text) {
     levelTimeline = []; 
     eventTimeline = [];
     
+    // Start with default config that will be inherited
     let workingConfig = { 
         shipsPerMin: 150, energyCapsuleSpeed: 0.1,
         chargers: { emojis: [], speed: 1.5, weight: 10, dropChance: 1.0, nukeChance: 0.0 }, 
@@ -443,6 +491,7 @@ function parseConfigText(text) {
     const lines = text.split('\n');
     let currentSection = null;
     let inEventBlock = false;
+    let inLevelBlock = false;
 
     const levelHeaderRegex = /\[Level\s+(.+)\]\s*<LevelStart\s+(\d+):(\d+)>/i;
     const eventHeaderRegex = /\[Event\]\s*\{/i;
@@ -478,12 +527,18 @@ function parseConfigText(text) {
 
         const levelMatch = l.match(levelHeaderRegex);
         if (levelMatch) {
-            if (currentLevelStartTime !== -1) { levelTimeline.push({ time: currentLevelStartTime, name: currentLevelLabel, config: cloneConfig(workingConfig) }); }
+            // Save previous level with its accumulated config
+            if (currentLevelStartTime !== -1) { 
+                levelTimeline.push({ time: currentLevelStartTime, name: currentLevelLabel, config: cloneConfig(workingConfig) }); 
+            }
+            // Start new level - inherit all settings from workingConfig
             currentLevelStartTime = (parseInt(levelMatch[2]) * 60 + parseInt(levelMatch[3])) * 1000;
             currentLevelLabel = "LEVEL " + levelMatch[1];
+            currentSection = null; // Reset section when entering new level
             return;
         }
 
+        // Apply settings to workingConfig (affects current and future levels)
         const spmMatch = l.match(spmRegex);
         if (spmMatch) { let val = parseInt(spmMatch[1]); if (val < 1) val = 1; if (val > 9999) val = 9999; workingConfig.shipsPerMin = val; }
         const capsMatch = l.match(capsSpeedRegex);
@@ -507,7 +562,10 @@ function parseConfigText(text) {
             if (nukeMatch) workingConfig[currentSection].nukeChance = parseFloat(nukeMatch[1]) / 100;
 
             const found = l.match(emojiRegex);
-            if(found) workingConfig[currentSection].emojis.push(...found);
+            if(found) {
+                // Replace emojis for this section rather than appending
+                workingConfig[currentSection].emojis = [...found];
+            }
         }
     });
 
@@ -732,22 +790,49 @@ function launchRockets(p) {
 }
 
 function launchNuke(pIdx) {
-    if (players[pIdx].nukes <= 0 || !players[pIdx].hasNuclearWeapon) return;
+    if (players[pIdx].nukes <= 0) return;
     players[pIdx].nukes--; updateNukeDisplay();
-    activeNukes.push({ x: players[pIdx].x + 16, y: players[pIdx].y + 32, w: 32, h: 32, vy: 200 });
+    activeNukes.push({ x: players[pIdx].x + 16, y: players[pIdx].y + 32, w: 32, h: 32, vy: 100 }); // Slower: 100 instead of 200
 }
 
-function detonateNuke() {
+function detonateNuke(x, y) {
     sfx.explosion('nuke');
+    
+    // Create massive explosion particles
+    for(let i=0; i<50; i++) {
+        particles.push({ 
+            x: x, y: y, 
+            vx: (Math.random()-0.5)*12, 
+            vy: (Math.random()-0.5)*12, 
+            life: 1.5, 
+            color: ['#ff0000', '#ff5500', '#ffaa00', '#ffff00'][Math.floor(Math.random()*4)], 
+            size: 8+Math.random()*8 
+        });
+    }
+    
+    // Create expanding shockwaves
+    shockwaves.push({ x: x, y: y, radius: 0, maxRadius: 300, life: 1.0, speed: 400 });
+    shockwaves.push({ x: x, y: y, radius: 0, maxRadius: 250, life: 1.0, speed: 350, delay: 100 });
+    shockwaves.push({ x: x, y: y, radius: 0, maxRadius: 200, life: 1.0, speed: 300, delay: 200 });
+    
+    // Destroy all enemies
     for (let i = 0; i < enemies.length; i++) {
         createExplosion(enemies[i].x + enemies[i].w/2, enemies[i].y + enemies[i].h/2, '#ffaa00', 2.0);
         if(enemies[i].type === 'shooter' && enemies[i].slotIndex !== -1) SWARM.slots[enemies[i].slotIndex] = false;
     }
     enemies.length = 0; 
+    
+    // White flash effect
     let flash = document.createElement('div');
-    flash.style.position = 'fixed'; flash.style.top = 0; flash.style.left = 0; flash.style.width = '100%'; flash.style.height = '100%'; flash.style.backgroundColor = 'white'; flash.style.zIndex = 9999;
+    flash.style.position = 'fixed'; flash.style.top = 0; flash.style.left = 0; 
+    flash.style.width = '100%'; flash.style.height = '100%'; 
+    flash.style.backgroundColor = 'white'; flash.style.zIndex = 9999;
     document.body.appendChild(flash);
-    setTimeout(() => { flash.style.transition = 'opacity 1s'; flash.style.opacity = 0; setTimeout(() => flash.remove(), 1000); }, 50);
+    setTimeout(() => { 
+        flash.style.transition = 'opacity 1s'; 
+        flash.style.opacity = 0; 
+        setTimeout(() => flash.remove(), 1000); 
+    }, 50);
 }
 
 function updateBullets(arr, spd, dt) { for(let i=arr.length-1; i>=0; i--) { arr[i].y += spd * dt; if(arr[i].y < -20 || arr[i].y > HEIGHT+20) arr.splice(i, 1); } }
@@ -899,8 +984,36 @@ function update(dt) {
     }
     
     for(let i=activeNukes.length-1; i>=0; i--) {
-        let n = activeNukes[i]; n.y += (n.vy/1000) * dt; 
-        if (n.y > HEIGHT) { detonateNuke(); activeNukes.splice(i, 1); }
+        let n = activeNukes[i]; 
+        n.y += (n.vy/1000) * dt; 
+        
+        // Check collision with enemies
+        let hit = false;
+        for(let eIdx=enemies.length-1; eIdx>=0; eIdx--) {
+            if(rectIntersect(n, enemies[eIdx])) {
+                hit = true;
+                break;
+            }
+        }
+        
+        if (hit || n.y > HEIGHT) { 
+            detonateNuke(n.x + n.w/2, n.y + n.h/2); 
+            activeNukes.splice(i, 1); 
+        }
+    }
+    
+    // Update shockwaves
+    for(let i=shockwaves.length-1; i>=0; i--) {
+        let sw = shockwaves[i];
+        if(sw.delay && sw.delay > 0) {
+            sw.delay -= dt;
+        } else {
+            sw.radius += (sw.speed / 1000) * dt;
+            sw.life -= 0.01;
+            if(sw.radius >= sw.maxRadius || sw.life <= 0) {
+                shockwaves.splice(i, 1);
+            }
+        }
     }
 
     for(let i=enemies.length-1; i>=0; i--) {
@@ -1019,6 +1132,28 @@ function draw() {
         ctx.restore();
     });
     activeNukes.forEach(n => { ctx.drawImage(assets.nuke_pickup, n.x, n.y, n.w, n.h); });
+    
+    // Draw shockwaves
+    shockwaves.forEach(sw => {
+        if(!sw.delay || sw.delay <= 0) {
+            ctx.save();
+            ctx.strokeStyle = `rgba(255, 100, 0, ${sw.life})`;
+            ctx.lineWidth = 8;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#ff6600';
+            ctx.beginPath();
+            ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Inner glow
+            ctx.strokeStyle = `rgba(255, 200, 0, ${sw.life * 0.5})`;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(sw.x, sw.y, sw.radius - 10, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+    });
     enemies.forEach(e => { if (e.type === 'bugger') { ctx.save(); ctx.translate(e.x + e.w/2, e.y + e.h/2); ctx.rotate(e.rotation); if(e.emoji) { ctx.font = "28px Arial"; ctx.textAlign="center"; ctx.fillText(e.emoji, 0, 10); } else { ctx.drawImage(assets[e.type], -e.w/2, -e.h/2, e.w, e.h); } ctx.restore(); } else { if(e.flashTimer > 0) { ctx.save(); ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = "white"; ctx.fillRect(e.x, e.y, e.w, e.h); ctx.restore(); } else { if(e.emoji) { ctx.font = (e.type==='fatty'?"50px":"28px")+" Arial"; ctx.textAlign="center"; ctx.fillText(e.emoji, e.x+e.w/2, e.y+e.h/1.2); } else { ctx.drawImage(assets[e.type], e.x, e.y, e.w, e.h); } } } });
     ctx.fillStyle = "#ff0"; pBullets.forEach(b => ctx.drawImage(assets.bullet, b.x, b.y, b.w, b.h));
     eBullets.forEach(b => { if(b.type === 'rocket') { ctx.fillStyle = '#ccc'; ctx.beginPath(); ctx.moveTo(b.x + b.w/2, b.y); ctx.lineTo(b.x + b.w, b.y + b.h); ctx.lineTo(b.x, b.y + b.h); ctx.fill(); } else { ctx.fillStyle = (animFrame % 4 < 2) ? '#ff0000' : '#ff7700'; ctx.fillRect(b.x, b.y, b.w, b.h); } });
