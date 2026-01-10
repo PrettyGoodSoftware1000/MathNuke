@@ -1009,7 +1009,7 @@ function update(dt) {
             sw.delay -= dt;
         } else {
             sw.radius += (sw.speed / 1000) * dt;
-            sw.life -= 0.01;
+            sw.life -= 0.001 * dt; // Make it frame-rate independent
             if(sw.radius >= sw.maxRadius || sw.life <= 0) {
                 shockwaves.splice(i, 1);
             }
@@ -1137,7 +1137,8 @@ function draw() {
     shockwaves.forEach(sw => {
         if(!sw.delay || sw.delay <= 0) {
             ctx.save();
-            ctx.strokeStyle = `rgba(255, 100, 0, ${sw.life})`;
+            let alpha = Math.max(0, sw.life); // Clamp to prevent negative alpha
+            ctx.strokeStyle = `rgba(255, 100, 0, ${alpha})`;
             ctx.lineWidth = 8;
             ctx.shadowBlur = 20;
             ctx.shadowColor = '#ff6600';
@@ -1145,12 +1146,14 @@ function draw() {
             ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
             ctx.stroke();
             
-            // Inner glow
-            ctx.strokeStyle = `rgba(255, 200, 0, ${sw.life * 0.5})`;
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.arc(sw.x, sw.y, sw.radius - 10, 0, Math.PI * 2);
-            ctx.stroke();
+            // Inner glow - only draw if radius is large enough
+            if(sw.radius > 10) {
+                ctx.strokeStyle = `rgba(255, 200, 0, ${alpha * 0.5})`;
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(sw.x, sw.y, sw.radius - 10, 0, Math.PI * 2);
+                ctx.stroke();
+            }
             ctx.restore();
         }
     });
