@@ -1,25 +1,15 @@
-
-
-[Level 1] <LevelStart 0:00>
-
-[ShipsPerMin 70]
-
-[EnergyCapsuleSpeed 3%]
-
-[Event]{
-[0:30]
-[Buggers] <Count 3>
-}
+[Level 0] <LevelStart 0:00>
+[ShipsPerMin 120]
 
 [Chargers]
 <speed 150%>
-<commonness 0%>
-<PowerDropChance 100%>
-<NukeDropChance 5%>
+<commonness 15%>
+<PowerDropChance 0%>
+<NukeDropChance 100%>
 
 [Shooters]
 <speed 80%>
-<commonness 100%>
+<commonness 85%>
 <PowerDropChance 10%>
 <NukeDropChance 5%>
 
@@ -35,6 +25,16 @@
 <PowerDropChance 100%>
 <NukeDropChance 5%>
 
+[Level 1] <LevelStart 0:00>
+
+[ShipsPerMin 70]
+
+[EnergyCapsuleSpeed 3%]
+
+[Event]{
+[0:30]
+[Buggers] <Count 3>
+}
 
 
 
@@ -43,65 +43,6 @@
 
 [ShipsPerMin 80]
 
-[EnergyCapsuleSpeed 3%]
-[Chargers]
-<speed 150%>
-<commonness 0%>
-<PowerDropChance 100%>
-<NukeDropChance 5%>
-
-[Shooters]
-<speed 80%>
-<commonness 100%>
-<PowerDropChance 10%>
-<NukeDropChance 85%>
-
-[Fatties]
-<speed 50%>
-<commonness 0%>
-<PowerDropChance 100%>
-<NukeDropChance 50%>
-
-[Buggers]
-<speed 65%>
-<commonness 0%>
-<PowerDropChance 100%>
-<NukeDropChance 5%>
-
-
-
 
 [Level 3] <LevelStart 2:00>
 
-[ShipsPerMin 25]
-
-[EnergyCapsuleSpeed 1%]
-
-[Event]{
-[2:20]
-[Chargers] <Count 15>
-}
-
-[Chargers]
-<speed 150%>
-<commonness 0%>
-<PowerDropChance 100%>
-<NukeDropChance 5%>
-
-[Shooters]
-<speed 80%>
-<commonness 100%>
-<PowerDropChance 10%>
-<NukeDropChance 85%>
-
-[Fatties]
-<speed 50%>
-<commonness 0%>
-<PowerDropChance 100%>
-<NukeDropChance 50%>
-
-[Buggers]
-<speed 65%>
-<commonness 0%>
-<PowerDropChance 100%>
-<NukeDropChance 5%>
