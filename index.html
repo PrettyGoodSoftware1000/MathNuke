@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GALAGO v80 - Space Fighter Edition</title>
+    <title>GALAGO v81 - Custom Sprite Edition</title>
     <style>
         /* --- GLOBAL RESET --- */
         html, body {
@@ -74,6 +74,7 @@
             outline: none;
             width: 100%;
             height: 100%;
+            image-rendering: pixelated; /* Keeps pixel art crisp */
         }
 
         .sidebar {
@@ -188,17 +189,24 @@
             color: #fff;
         }
 
-        #customBtn {
-            position: fixed; bottom: 15px; left: 15px;
-            background-color: #252540; color: #707090;
-            border: 1px solid #303050; padding: 10px 16px;
-            font-family: 'Courier New', monospace; font-size: 14px;
-            cursor: pointer; border-radius: 4px; transition: all 0.2s; z-index: 1000;
+        /* --- CONTROL BAR AT BOTTOM --- */
+        #control-bar {
+            position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 10px; z-index: 1000;
+            background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; border: 1px solid #444;
         }
-        #customBtn:hover { background-color: #353555; color: #fff; border-color: #606080; }
+
+        .sys-btn {
+            background-color: #252540; color: #707090;
+            border: 1px solid #303050; padding: 8px 12px;
+            font-family: 'Courier New', monospace; font-size: 12px;
+            cursor: pointer; border-radius: 4px; transition: all 0.2s;
+        }
+        .sys-btn:hover { background-color: #353555; color: #fff; border-color: #606080; }
+        .sys-btn.active { border-color: #00ff00; color: #00ff00; }
         
         #toast {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
             background: #222; color: #0f0; padding: 10px 20px;
             border-radius: 20px; border: 1px solid #444; opacity: 0;
             transition: opacity 0.5s; pointer-events: none; z-index: 2000;
@@ -272,15 +280,26 @@
         <div class="controls-info"><strong>P1:</strong> Arrows/Shift/Z(Rockets)/X(Nuke) | <strong>P2:</strong> Stick/A | <strong>O/W</strong> Fill Power | <strong>T</strong> Timer | <strong>P</strong> Pause</div>
     </div>
 
-    <input type="file" id="hiddenFileInput" style="display: none;" accept=".txt">
-    <button id="customBtn">Load Config.txt</button>
-    <div id="toast">Config Loaded!</div>
+    <input type="file" id="configFile" style="display: none;" accept=".txt">
+    <input type="file" id="p1SpriteInput" style="display: none;" accept="image/png, image/jpeg">
+    <input type="file" id="p2SpriteInput" style="display: none;" accept="image/png, image/jpeg">
+
+    <div id="control-bar">
+        <button class="sys-btn" id="btnLoadConfig">Load Config.txt</button>
+        <button class="sys-btn" id="btnLoadP1">Load P1 Sprite</button>
+        <button class="sys-btn" id="btnLoadP2">Load P2 Sprite</button>
+    </div>
+
+    <div id="toast">Ready!</div>
 
 <script>
 // --- 1. SETUP CONSTANTS & STATE ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const WIDTH = 720; const HEIGHT = 540;
+
+// Improve pixel art rendering
+ctx.imageSmoothingEnabled = false;
 
 let lastTime = 0;
 let gameStarted = false;
@@ -343,35 +362,26 @@ function generateSprite(type) {
     const c = document.createElement('canvas'); const x = c.getContext('2d');
     let scale = 4, w=32, h=32, colors=[], pattern=[];
 
+    // Default Fallback Sprites (Procedural)
     if(type.includes('p1') || type.includes('p2')) {
-        // --- UPDATED FIGHTER JET SPRITE ---
         w=64; h=64;
-        
-        // Palette:
-        // 1: White/Light Grey (Shuttle Body/Ceramics)
-        // 2: Dark Grey/Black (Heat Tiles/Stealth Edges)
-        // 3: Electric Blue (Cockpit)
-        // 4: Safety Orange (Engines/Highlights)
-        // 5: Mid-Grey (Mechanical details)
         colors=['#eeeeee', '#222222', '#00ccff', '#ff5500', '#999999'];
-        
-        // 16x16 Grid Design (Scaled x4 = 64px)
         pattern = [
-            "0000000110000000", // Nose tip
-            "0000001221000000", // Nose cone
-            "0000002332000000", // Cockpit start
-            "0000002332000000", // Cockpit main
-            "0000011111100000", // Fuselage start
-            "0000015115100000", // Fuselage vents
-            "0000111551110000", // Leading edge
-            "0000115555110000", // Body
-            "0001115555111000", // Wings expanding
-            "0001211111121000", // Wing structure
-            "0011211111121100", // Wingspan
-            "0011122222211100", // Rear flaps
-            "0112211441122110", // Engine housing
-            "0112214444122110", // Engine glow
-            "1220004444000221", // Thrusters
+            "0000000110000000",
+            "0000001221000000",
+            "0000002332000000",
+            "0000002332000000",
+            "0000011111100000",
+            "0000015115100000",
+            "0000111551110000",
+            "0000115555110000",
+            "0001115555111000",
+            "0001211111121000",
+            "0011211111121100",
+            "0011122222211100",
+            "0112211441122110",
+            "0112214444122110",
+            "1220004444000221",
             "0000000000000000"
         ];
     } else if (type === 'charger') {
@@ -442,7 +452,7 @@ initStars();
 function updateStars(dt) { stars.forEach(star => { star.y += star.speedBase * dt; if(star.y > HEIGHT) { star.y = -star.size; star.x = Math.random() * WIDTH; }}); }
 function drawStars() { ctx.fillStyle = '#fff'; stars.forEach(star => ctx.fillRect(star.x, star.y, star.size, star.size)); }
 
-// --- 5. CONFIG PARSER ---
+// --- 5. CONFIG & FILE LOADING ---
 function parseConfigText(text) {
     if(!text || text.trim() === "") return;
 
@@ -466,7 +476,6 @@ function parseConfigText(text) {
     const lines = text.split('\n');
     let currentSection = null;
     let inEventBlock = false;
-    let inLevelBlock = false;
 
     const levelHeaderRegex = /\[Level\s+(.+)\]\s*<LevelStart\s+(\d+):(\d+)>/i;
     const eventHeaderRegex = /\[Event\]\s*\{/i;
@@ -502,18 +511,15 @@ function parseConfigText(text) {
 
         const levelMatch = l.match(levelHeaderRegex);
         if (levelMatch) {
-            // Save previous level with its accumulated config
             if (currentLevelStartTime !== -1) { 
                 levelTimeline.push({ time: currentLevelStartTime, name: currentLevelLabel, config: cloneConfig(workingConfig) }); 
             }
-            // Start new level - inherit all settings from workingConfig
             currentLevelStartTime = (parseInt(levelMatch[2]) * 60 + parseInt(levelMatch[3])) * 1000;
             currentLevelLabel = "LEVEL " + levelMatch[1];
-            currentSection = null; // Reset section when entering new level
+            currentSection = null; 
             return;
         }
 
-        // Apply settings to workingConfig (affects current and future levels)
         const spmMatch = l.match(spmRegex);
         if (spmMatch) { let val = parseInt(spmMatch[1]); if (val < 1) val = 1; if (val > 9999) val = 9999; workingConfig.shipsPerMin = val; }
         const capsMatch = l.match(capsSpeedRegex);
@@ -538,7 +544,6 @@ function parseConfigText(text) {
 
             const found = l.match(emojiRegex);
             if(found) {
-                // Replace emojis for this section rather than appending
                 workingConfig[currentSection].emojis = [...found];
             }
         }
@@ -549,19 +554,52 @@ function parseConfigText(text) {
     eventTimeline.sort((a,b) => a.time - b.time);
     showToast(`Config Loaded! (${levelTimeline.length} Levels, ${eventTimeline.length} Events)`);
     
-    const btn = document.getElementById('customBtn');
-    if (btn) {
-        btn.style.backgroundColor = '#111';
-        btn.style.color = '#444';
-        btn.style.borderColor = '#222';
-    }
-    
     if (!gameStarted && levelTimeline.length > 0) {
         const startLvl = levelTimeline.find(lvl => lvl.time === 0);
         if(startLvl) { enemyConfig = startLvl.config; currentLevelName = startLvl.name; document.getElementById('levelIndicator').innerText = currentLevelName; }
     }
 }
 
+// --- FILE UPLOAD HANDLERS ---
+function setupFileLoader(btnId, inputId, handler) {
+    const btn = document.getElementById(btnId);
+    const inp = document.getElementById(inputId);
+    btn.addEventListener('click', () => inp.click());
+    inp.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            handler(evt.target.result);
+            btn.classList.add('active'); // Visual feedback
+            setTimeout(() => btn.classList.remove('active'), 500);
+        };
+        if(inputId === 'configFile') reader.readAsText(file);
+        else reader.readAsDataURL(file); // Images
+        e.target.value = '';
+    });
+}
+
+// Config Loader
+setupFileLoader('btnLoadConfig', 'configFile', (text) => {
+    parseConfigText(text);
+    canvas.focus();
+});
+
+// Sprite Loader Logic
+function loadSprite(dataUrl, assetKey) {
+    const img = new Image();
+    img.src = dataUrl;
+    img.onload = () => {
+        assets[assetKey] = img;
+        showToast(assetKey.toUpperCase() + " Sprite Loaded!");
+    };
+}
+
+setupFileLoader('btnLoadP1', 'p1SpriteInput', (data) => loadSprite(data, 'p1'));
+setupFileLoader('btnLoadP2', 'p2SpriteInput', (data) => loadSprite(data, 'p2'));
+
+// Automatic P1/P2 PNG loading from local folder
 window.addEventListener('load', () => {
     // Initialize HUD text immediately
     document.getElementById('p1Stats').innerHTML = 'Reactor Power: 0%<br>Lives: 25';
@@ -569,33 +607,23 @@ window.addEventListener('load', () => {
     document.getElementById('gameTitle').textContent = 'MATH NUKE';
     document.getElementById('levelIndicator').textContent = 'LEVEL 1';
     
-    // Try to load config.txt with better error handling
+    // Try to load config.txt
     fetch('config.txt?t=' + Date.now())
-        .then(res => { 
-            console.log('Config fetch status:', res.status, res.ok);
-            if(!res.ok) throw new Error("Config not found - status: " + res.status); 
-            return res.text(); 
-        })
-        .then(text => {
-            console.log('Config loaded, length:', text.length);
-            parseConfigText(text);
-        })
-        .catch(e => {
-            console.log("Config loading failed:", e.message);
-            console.log("You can still load config manually with the button");
-        });
+        .then(res => { if(!res.ok) throw new Error("404"); return res.text(); })
+        .then(text => parseConfigText(text))
+        .catch(e => console.log("Manual config load required"));
     
-    const imgs = ['p1.png', 'p2.png', 'Ship1.png', 'Ship2.png', 'ship1.png', 'ship2.png', 'enemy.png'];
-    imgs.forEach(name => {
-        const i = new Image(); i.src = name;
-        i.onload = () => {
-            const lower = name.toLowerCase();
-            // Optional image override logic if files exist, otherwise procedural sprites are used
-            // if(lower.includes('p1') || lower.includes('ship1')) assets.p1 = i;
-            // if(lower.includes('p2') || lower.includes('ship2')) assets.p2 = i;
-            if(lower.includes('enemy')) { assets.charger=i; assets.shooter=i; assets.bugger=i; }
-        };
-    });
+    // Try to load local PNGs if they exist
+    const tryLoad = (name, key) => {
+        const img = new Image();
+        img.src = name;
+        img.onload = () => { console.log("Loaded " + name); assets[key] = img; };
+        img.onerror = () => { console.log(name + " not found, using default"); };
+    };
+    tryLoad('p1.png', 'p1');
+    tryLoad('p2.png', 'p2');
+    tryLoad('Ship1.png', 'p1'); // Legacy support
+    tryLoad('Ship2.png', 'p2'); // Legacy support
 });
 
 function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.style.opacity = 1; setTimeout(() => t.style.opacity = 0, 3000); }
@@ -604,8 +632,6 @@ function showFloatingText(playerId, amount) {
     const el = document.createElement('div'); el.className = 'score-float'; el.innerText = '+' + amount; container.appendChild(el);
     setTimeout(() => el.remove(), 1500);
 }
-document.getElementById('customBtn').addEventListener('click', () => { document.getElementById('hiddenFileInput').click(); });
-document.getElementById('hiddenFileInput').addEventListener('change', (e) => { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = function(event){ parseConfigText(event.target.result); canvas.focus(); }; reader.readAsText(file); e.target.value = ''; });
 
 // --- 6. GAME LOGIC ---
 const sfx = {
@@ -902,7 +928,6 @@ function update(dt) {
         
         if (r.phase === 'deploy') { 
             r.x += r.vx * dt; 
-            // Don't rotate during deploy phase - stays upright
             if (r.timer > 1000) { 
                 r.phase = 'homing';
                 if (enemies.length > 0) {
@@ -914,21 +939,20 @@ function update(dt) {
                 let dx = (r.target.x + r.target.w/2) - (r.x + r.w/2);
                 let dy = (r.target.y + r.target.h/2) - (r.y + r.h/2);
                 let angle = Math.atan2(dy, dx);
-                let speed = 0.2; // Reduced by 50% from 0.4
+                let speed = 0.2; 
                 r.vx = Math.cos(angle) * speed;
                 r.vy = Math.sin(angle) * speed;
             } else {
                 if (enemies.length > 0) {
                     r.target = enemies[Math.floor(Math.random() * enemies.length)];
                 } else {
-                    r.vy = -0.15; // Reduced by 50%
+                    r.vy = -0.15; 
                     r.vx *= 0.95;
                 }
             }
             
             r.x += r.vx * dt;
             r.y += r.vy * dt;
-            // Only rotate when homing (moving upward)
             r.rotation = Math.atan2(r.vy, r.vx) + Math.PI / 2;
             
             if (Math.random() < 0.5) {
@@ -982,11 +1006,8 @@ function update(dt) {
     for(let i=activeNukes.length-1; i>=0; i--) {
         let n = activeNukes[i]; 
         
-        // Homing behavior like rockets but at half speed
         if (n.phase === 'homing') {
-            // Always try to find a target
             if (!n.target || !enemies.includes(n.target)) {
-                // Pick closest enemy as target
                 if (enemies.length > 0) {
                     let closest = null;
                     let minDist = 999999;
@@ -1002,15 +1023,13 @@ function update(dt) {
             }
             
             if (n.target && enemies.includes(n.target)) {
-                // Target exists, home in on it
                 let dx = (n.target.x + n.target.w/2) - (n.x + n.w/2);
                 let dy = (n.target.y + n.target.h/2) - (n.y + n.h/2);
                 let angle = Math.atan2(dy, dx);
-                let speed = 0.1; // Half the speed of rockets (0.2)
+                let speed = 0.1; 
                 n.vx = Math.cos(angle) * speed;
                 n.vy = Math.sin(angle) * speed;
             } else {
-                // No enemies, fly upward (negative Y)
                 n.vy = -0.15;
                 n.vx *= 0.95;
             }
@@ -1020,7 +1039,6 @@ function update(dt) {
             n.rotation = Math.atan2(n.vy, n.vx) + Math.PI / 2;
         }
         
-        // Check collision with enemies
         let hit = false;
         for(let eIdx=enemies.length-1; eIdx>=0; eIdx--) {
             if(rectIntersect(n, enemies[eIdx])) {
@@ -1042,7 +1060,7 @@ function update(dt) {
             sw.delay -= dt;
         } else {
             sw.radius += (sw.speed / 1000) * dt;
-            sw.life -= 0.001 * dt; // Make it frame-rate independent
+            sw.life -= 0.001 * dt; 
             if(sw.radius >= sw.maxRadius || sw.life <= 0) {
                 shockwaves.splice(i, 1);
             }
