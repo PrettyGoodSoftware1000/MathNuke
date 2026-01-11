@@ -165,16 +165,17 @@
             align-items: center;
         }
         .nuke-icon {
-            width: 24px;
-            height: 24px;
-            background-color: #333;
-            border: 1px solid #555;
+            width: 20px;
+            height: 20px;
             display: inline-block;
+            font-size: 16px;
+            text-align: center;
+            line-height: 20px;
+            opacity: 0.3;
         }
         .nuke-active {
-            background-color: #00ff00;
-            border: 1px solid #ff0000;
-            box-shadow: 0 0 5px #00ff00;
+            opacity: 1;
+            filter: drop-shadow(0 0 3px #ffff00);
         }
 
         .controls-info {
@@ -890,6 +891,8 @@ function updateNukeDisplay() {
         for(let j=0; j<3; j++) {
             const icon = document.createElement('div');
             icon.className = 'nuke-icon';
+            icon.innerHTML = '☢';
+            icon.style.color = '#ffff00';
             if(j < players[i].nukes) icon.classList.add('nuke-active');
             container.appendChild(icon);
         }
@@ -961,7 +964,25 @@ function launchRockets(p) {
 function launchNuke(pIdx) {
     if (players[pIdx].nukes <= 0) return;
     players[pIdx].nukes--; updateNukeDisplay();
-    activeNukes.push({ x: players[pIdx].x + 16, y: players[pIdx].y + 32, w: 32, h: 32, vy: 100 }); // Slower: 100 instead of 200
+    
+    // Pick initial target if enemies exist
+    let initialTarget = null;
+    if (enemies.length > 0) {
+        initialTarget = enemies[Math.floor(Math.random() * enemies.length)];
+    }
+    
+    // Launch nuke forward with initial velocity
+    activeNukes.push({ 
+        x: players[pIdx].x + 16, 
+        y: players[pIdx].y, 
+        w: 32, 
+        h: 32, 
+        vx: 0,
+        vy: -0.1, // Start moving forward slowly
+        phase: 'homing',
+        target: initialTarget,
+        rotation: 0
+    });
 }
 
 function detonateNuke(x, y) {
@@ -1239,7 +1260,44 @@ function update(dt) {
     
     for(let i=activeNukes.length-1; i>=0; i--) {
         let n = activeNukes[i]; 
-        n.y += (n.vy/1000) * dt; 
+        
+        // Homing behavior like rockets but at half speed
+        if (n.phase === 'homing') {
+            // Always try to find a target
+            if (!n.target || !enemies.includes(n.target)) {
+                // Pick closest enemy as target
+                if (enemies.length > 0) {
+                    let closest = null;
+                    let minDist = 999999;
+                    enemies.forEach(e => {
+                        let dist = Math.hypot(e.x - n.x, e.y - n.y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            closest = e;
+                        }
+                    });
+                    n.target = closest;
+                }
+            }
+            
+            if (n.target && enemies.includes(n.target)) {
+                // Target exists, home in on it
+                let dx = (n.target.x + n.target.w/2) - (n.x + n.w/2);
+                let dy = (n.target.y + n.target.h/2) - (n.y + n.h/2);
+                let angle = Math.atan2(dy, dx);
+                let speed = 0.1; // Half the speed of rockets (0.2)
+                n.vx = Math.cos(angle) * speed;
+                n.vy = Math.sin(angle) * speed;
+            } else {
+                // No enemies, fly upward (negative Y)
+                n.vy = -0.15;
+                n.vx *= 0.95;
+            }
+            
+            n.x += n.vx * dt;
+            n.y += n.vy * dt;
+            n.rotation = Math.atan2(n.vy, n.vx) + Math.PI / 2;
+        }
         
         // Check collision with enemies
         let hit = false;
@@ -1250,7 +1308,7 @@ function update(dt) {
             }
         }
         
-        if (hit || n.y > HEIGHT) { 
+        if (hit || n.y < -50 || n.y > HEIGHT || n.x < -50 || n.x > WIDTH + 50) { 
             detonateNuke(n.x + n.w/2, n.y + n.h/2); 
             activeNukes.splice(i, 1); 
         }
@@ -1385,7 +1443,13 @@ function draw() {
         }
         ctx.restore();
     });
-    activeNukes.forEach(n => { ctx.drawImage(assets.nuke_pickup, n.x, n.y, n.w, n.h); });
+    activeNukes.forEach(n => { 
+        ctx.save();
+        ctx.translate(n.x + n.w/2, n.y + n.h/2);
+        ctx.rotate(n.rotation);
+        ctx.drawImage(assets.nuke_pickup, -n.w/2, -n.h/2, n.w, n.h);
+        ctx.restore();
+    });
     
     // Draw shockwaves
     shockwaves.forEach(sw => {
