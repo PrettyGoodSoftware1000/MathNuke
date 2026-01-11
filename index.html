@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GALAGO v79</title>
+    <title>GALAGO v80 - Space Fighter Edition</title>
     <style>
         /* --- GLOBAL RESET --- */
         html, body {
@@ -231,7 +231,6 @@
         </div>
 
         <div id="main-row">
-            <!-- P1 SIDEBAR -->
             <div class="sidebar">
                 <div id="p1-menu" class="weapon-menu">
                     <button class="weapon-btn" onclick="selectWeapon(0, 1)">Blaster x 2</button>
@@ -249,7 +248,6 @@
 
             <div id="gameContainer"><canvas id="gameCanvas" width="720" height="540" tabindex="1"></canvas></div>
 
-            <!-- P2 SIDEBAR -->
             <div class="sidebar">
                 <div class="bar-container" id="p2-bar-container">
                     <div id="p2-fill" class="bar-fill">
@@ -266,7 +264,6 @@
             </div>
         </div>
 
-        <!-- NUKE DISPLAY -->
         <div id="nuke-inventory-container">
             <div id="p1-nukes" class="nuke-slot"></div>
             <div id="p2-nukes" class="nuke-slot" style="justify-content: flex-end;"></div>
@@ -280,8 +277,6 @@
     <div id="toast">Config Loaded!</div>
 
 <script>
-// Layout manager removed - using CSS flexbox centering instead
-
 // --- 1. SETUP CONSTANTS & STATE ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -348,57 +343,36 @@ function generateSprite(type) {
     const c = document.createElement('canvas'); const x = c.getContext('2d');
     let scale = 4, w=32, h=32, colors=[], pattern=[];
 
-    if(type.includes('p1')) {
-        // Phoenix emblem - matching uploaded colors
+    if(type.includes('p1') || type.includes('p2')) {
+        // --- UPDATED FIGHTER JET SPRITE ---
         w=64; h=64;
-        colors=['#DC143C','#FFFFFF','#4169E1','#8B0000','#FFD700'];
+        
+        // Palette:
+        // 1: White/Light Grey (Shuttle Body/Ceramics)
+        // 2: Dark Grey/Black (Heat Tiles/Stealth Edges)
+        // 3: Electric Blue (Cockpit)
+        // 4: Safety Orange (Engines/Highlights)
+        // 5: Mid-Grey (Mechanical details)
+        colors=['#eeeeee', '#222222', '#00ccff', '#ff5500', '#999999'];
+        
+        // 16x16 Grid Design (Scaled x4 = 64px)
         pattern = [
-            "00000000033000000000",
-            "00000003333330000000",
-            "00000033222333000000",
-            "00000332222223300000",
-            "00003322244222330000",
-            "00033222444422233000",
-            "00332224444442223300",
-            "03322244111442223330",
-            "33222441111114422233",
-            "32224411555511442223",
-            "32244115555551144223",
-            "32241155555555114223",
-            "32241155555555114223",
-            "03241155555555114230",
-            "00341155555555114300",
-            "00034115555551143000",
-            "00003411555114300000",
-            "00000341111143000000",
-            "00000034444300000000",
-            "00000003333000000000"
-        ];
-    } else if (type.includes('p2')) {
-        // Phoenix emblem - matching uploaded colors (same as P1)
-        w=64; h=64;
-        colors=['#DC143C','#FFFFFF','#4169E1','#8B0000','#FFD700'];
-        pattern = [
-            "00000000033000000000",
-            "00000003333330000000",
-            "00000033222333000000",
-            "00000332222223300000",
-            "00003322244222330000",
-            "00033222444422233000",
-            "00332224444442223300",
-            "03322244111442223330",
-            "33222441111114422233",
-            "32224411555511442223",
-            "32244115555551144223",
-            "32241155555555114223",
-            "32241155555555114223",
-            "03241155555555114230",
-            "00341155555555114300",
-            "00034115555551143000",
-            "00003411555114300000",
-            "00000341111143000000",
-            "00000034444300000000",
-            "00000003333000000000"
+            "0000000110000000", // Nose tip
+            "0000001221000000", // Nose cone
+            "0000002332000000", // Cockpit start
+            "0000002332000000", // Cockpit main
+            "0000011111100000", // Fuselage start
+            "0000015115100000", // Fuselage vents
+            "0000111551110000", // Leading edge
+            "0000115555110000", // Body
+            "0001115555111000", // Wings expanding
+            "0001211111121000", // Wing structure
+            "0011211111121100", // Wingspan
+            "0011122222211100", // Rear flaps
+            "0112211441122110", // Engine housing
+            "0112214444122110", // Engine glow
+            "1220004444000221", // Thrusters
+            "0000000000000000"
         ];
     } else if (type === 'charger') {
         colors=['#ff0055']; pattern = ["10000001","11000011","11100111","01111110","00111100","00011000","00111100","01000010"];
@@ -616,8 +590,9 @@ window.addEventListener('load', () => {
         const i = new Image(); i.src = name;
         i.onload = () => {
             const lower = name.toLowerCase();
-            if(lower.includes('p1') || lower.includes('ship1')) assets.p1 = i;
-            if(lower.includes('p2') || lower.includes('ship2')) assets.p2 = i;
+            // Optional image override logic if files exist, otherwise procedural sprites are used
+            // if(lower.includes('p1') || lower.includes('ship1')) assets.p1 = i;
+            // if(lower.includes('p2') || lower.includes('ship2')) assets.p2 = i;
             if(lower.includes('enemy')) { assets.charger=i; assets.shooter=i; assets.bugger=i; }
         };
     });
@@ -978,7 +953,7 @@ function update(dt) {
                 for (let j = 0; j < rockets.length; j++) {
                     if (j !== i && rockets[j].phase !== 'exploding') {
                         let rDist = Math.hypot((rockets[j].x + rockets[j].w/2) - (r.x + r.w/2), 
-                                               (rockets[j].y + rockets[j].h/2) - (r.y + r.h/2));
+                                              (rockets[j].y + rockets[j].h/2) - (r.y + r.h/2));
                         if (rDist < 100) {
                             rockets[j].phase = 'exploding';
                             rockets[j].explodeTimer = 100 + Math.random() * 200;
