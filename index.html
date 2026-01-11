@@ -295,7 +295,7 @@ let gameOver = false;
 let animFrame = 0;
 let showStars = false;
 let shipSelectionActive = false;
-let p1SelectedShip = 'arwing';
+let p1SelectedShip = 'phoenix';
 let p2SelectedShip = 'bomber';
 
 // --- MATH CHALLENGE STATE ---
@@ -352,7 +352,7 @@ function generateSprite(type) {
     let scale = 4, w=32, h=32, colors=[], pattern=[];
 
     if(type.includes('p1')) {
-        // Choose design: 'xwing', 'arwing', 'stealth', 'viper'
+        // Choose design: 'xwing', 'arwing', 'stealth', 'viper', 'phoenix'
         let design = p1SelectedShip; // Uses selected ship
         
         if(design === 'xwing') {
@@ -458,6 +458,32 @@ function generateSprite(type) {
                 "00001322222331100000",
                 "00000132223311000000",
                 "00000013333110000000"
+            ];
+        } else if(design === 'phoenix') {
+            // Phoenix-style red/orange bird-like fighter
+            w=64; h=64;
+            colors=['#ff0000','#ff6600','#ffff00','#cc0000','#ffffff'];
+            pattern = [
+                "00000000044000000000",
+                "00000000444400000000",
+                "00000003444430000000",
+                "00000034444443000000",
+                "00000344433444300000",
+                "00003444222244430000",
+                "00034442222224443000",
+                "00344422111122444300",
+                "03444221111112244430",
+                "34442211555511224443",
+                "34422115555551122443",
+                "34221155555555112243",
+                "34221155555555112243",
+                "03221155555555112230",
+                "00321155555555112300",
+                "00032115555551123000",
+                "00003211555112230000",
+                "00000321111123000000",
+                "00000032222230000000",
+                "00000003333300000000"
             ];
         }
     } else if (type.includes('p2')) {
@@ -1058,21 +1084,22 @@ function drawShipSelection() {
         { name: 'Arwing', design: 'arwing', player: 1 },
         { name: 'Stealth', design: 'stealth', player: 1 },
         { name: 'Viper', design: 'viper', player: 1 },
-        { name: 'TIE Fighter', design: 'tie', player: 2 },
+        { name: 'Phoenix', design: 'phoenix', player: 1 },
+        { name: 'TIE', design: 'tie', player: 2 },
         { name: 'Bomber', design: 'bomber', player: 2 },
-        { name: 'Interceptor', design: 'interceptor', player: 2 },
+        { name: 'Intercept', design: 'interceptor', player: 2 },
         { name: 'Defender', design: 'defender', player: 2 }
     ];
     
-    const startX = 90;
+    const startX = 60;
     const startY = 100;
-    const spacing = 160;
+    const spacing = 140;
     
     ships.forEach((ship, i) => {
-        const row = Math.floor(i / 4);
-        const col = i % 4;
+        const row = Math.floor(i / 5);
+        const col = i % 5;
         const x = startX + col * spacing;
-        const y = startY + row * 200;
+        const y = startY + row * 220;
         
         // Draw box
         const isSelected = (ship.player === 1 && p1SelectedShip === ship.design) || 
