@@ -372,6 +372,22 @@
             box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
             transform: scale(1.1);
         }
+        
+        .gamepad-status {
+            color: #888;
+            font-size: 12px;
+            text-align: center;
+            margin-top: 10px;
+            font-style: italic;
+        }
+        
+        .gamepad-status.connected {
+            color: #00ff00;
+        }
+        
+        .gamepad-status.warning {
+            color: #ffaa00;
+        }
     </style>
 </head>
 <body>
@@ -394,6 +410,7 @@
                     <button class="setup-btn selected" id="btn-p1-keyboard" onclick="selectP1Control('keyboard')">Keyboard</button>
                     <button class="setup-btn" id="btn-p1-gamepad" onclick="selectP1Control('gamepad')">Gamepad</button>
                 </div>
+                <div class="gamepad-status" id="p1-gamepad-status"></div>
             </div>
             
             <div class="setup-section" id="p2-control-section" style="opacity: 0.5;">
@@ -402,6 +419,7 @@
                     <button class="setup-btn" id="btn-p2-keyboard" onclick="selectP2Control('keyboard')" disabled>Keyboard</button>
                     <button class="setup-btn selected" id="btn-p2-gamepad" onclick="selectP2Control('gamepad')" disabled>Gamepad</button>
                 </div>
+                <div class="gamepad-status" id="p2-gamepad-status"></div>
             </div>
             
             <button class="start-btn" onclick="startGameFromSetup()">START GAME</button>
@@ -511,18 +529,60 @@ function selectPlayerCount(count) {
         p2KeyboardBtn.disabled = true;
         p2GamepadBtn.disabled = true;
     }
+    
+    updateGamepadStatus();
 }
 
 function selectP1Control(type) {
     p1ControlType = type;
     document.getElementById('btn-p1-keyboard').classList.toggle('selected', type === 'keyboard');
     document.getElementById('btn-p1-gamepad').classList.toggle('selected', type === 'gamepad');
+    updateGamepadStatus();
 }
 
 function selectP2Control(type) {
     p2ControlType = type;
     document.getElementById('btn-p2-keyboard').classList.toggle('selected', type === 'keyboard');
     document.getElementById('btn-p2-gamepad').classList.toggle('selected', type === 'gamepad');
+    updateGamepadStatus();
+}
+
+function updateGamepadStatus() {
+    const p1Status = document.getElementById('p1-gamepad-status');
+    const p2Status = document.getElementById('p2-gamepad-status');
+    
+    // P1 status
+    if (p1ControlType === 'gamepad') {
+        if (gamepadIndex !== null) {
+            p1Status.textContent = '✓ Gamepad 1 connected';
+            p1Status.className = 'gamepad-status connected';
+        } else {
+            p1Status.textContent = '⚠ No gamepad detected - press any button on gamepad';
+            p1Status.className = 'gamepad-status warning';
+        }
+    } else {
+        p1Status.textContent = '';
+        p1Status.className = 'gamepad-status';
+    }
+    
+    // P2 status
+    if (p2ControlType === 'gamepad' && numPlayers === 2) {
+        if (gamepadIndex !== null) {
+            if (gamepadIndex2 !== null) {
+                p2Status.textContent = '✓ Gamepad 2 connected';
+                p2Status.className = 'gamepad-status connected';
+            } else {
+                p2Status.textContent = '⚠ Will share Gamepad 1 (connect second gamepad for separate control)';
+                p2Status.className = 'gamepad-status warning';
+            }
+        } else {
+            p2Status.textContent = '⚠ No gamepad detected - press any button on gamepad';
+            p2Status.className = 'gamepad-status warning';
+        }
+    } else {
+        p2Status.textContent = '';
+        p2Status.className = 'gamepad-status';
+    }
 }
 
 function startGameFromSetup() {
@@ -612,6 +672,7 @@ const BASE_CAPSULE_SPEED = 2.0;
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const keys = {};
 let gamepadIndex = null;
+let gamepadIndex2 = null; // For Player 2 when using gamepad
 
 // ACTIVE CONFIG
 let enemyConfig = { 
@@ -1229,17 +1290,20 @@ function update(dt) {
                 }
                 if(keys['KeyQ'] && p.hasRockets && p.rocketCooldown <= 0) { launchRockets(p); p.rocketCooldown = 15000; showToast("P2 Rockets Launched!"); }
                 if(keys['KeyE'] && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(1); }
-            } else if (p2ControlType === 'gamepad' && gamepadIndex !== null) {
-                // P2 Gamepad controls
-                const gp = navigator.getGamepads()[gamepadIndex];
-                if(gp) { 
-                    if(Math.abs(gp.axes[0])>0.1) p.x += gp.axes[0]*0.4*dt; 
-                    if(gp.buttons[0].pressed && p.cd <= 0) { 
-                        if (p.weaponLevel === 2) { pBullets.push({x: p.x+16, y: p.y, w:8, h:16, owner: 1}); pBullets.push({x: p.x+40, y: p.y, w:8, h:16, owner: 1}); } else { pBullets.push({x: p.x+24, y: p.y, w:8, h:16, owner: 1}); }
-                        sfx.shoot(800); p.cd = 200; 
+            } else if (p2ControlType === 'gamepad') {
+                // P2 Gamepad controls - use second gamepad if available, otherwise share first
+                let gpIndex = (gamepadIndex2 !== null) ? gamepadIndex2 : gamepadIndex;
+                if (gpIndex !== null) {
+                    const gp = navigator.getGamepads()[gpIndex];
+                    if(gp) { 
+                        if(Math.abs(gp.axes[0])>0.1) p.x += gp.axes[0]*0.4*dt; 
+                        if(gp.buttons[0].pressed && p.cd <= 0) { 
+                            if (p.weaponLevel === 2) { pBullets.push({x: p.x+16, y: p.y, w:8, h:16, owner: 1}); pBullets.push({x: p.x+40, y: p.y, w:8, h:16, owner: 1}); } else { pBullets.push({x: p.x+24, y: p.y, w:8, h:16, owner: 1}); }
+                            sfx.shoot(800); p.cd = 200; 
+                        }
+                        if(gp.buttons[1].pressed && p.hasRockets && p.rocketCooldown <= 0) { launchRockets(p); p.rocketCooldown = 15000; showToast("P2 Rockets Launched!"); }
+                        if(gp.buttons[2].pressed && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(1); }
                     }
-                    if(gp.buttons[1].pressed && p.hasRockets && p.rocketCooldown <= 0) { launchRockets(p); p.rocketCooldown = 15000; showToast("P2 Rockets Launched!"); }
-                    if(gp.buttons[2].pressed && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(1); }
                 }
             }
         }
@@ -1606,9 +1670,36 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 window.addEventListener("gamepadconnected", e => {
-    gamepadIndex = e.gamepad.index;
-    showToast("Gamepad Connected!");
+    if (gamepadIndex === null) {
+        gamepadIndex = e.gamepad.index;
+        showToast("Gamepad 1 Connected!");
+    } else if (gamepadIndex2 === null && e.gamepad.index !== gamepadIndex) {
+        gamepadIndex2 = e.gamepad.index;
+        showToast("Gamepad 2 Connected!");
+    }
+    updateGamepadStatus();
 });
+
+// Periodically check for gamepad connections during setup
+let setupCheckInterval = setInterval(() => {
+    if (playerSetupComplete) {
+        clearInterval(setupCheckInterval);
+        return;
+    }
+    
+    const gamepads = navigator.getGamepads();
+    for (let i = 0; i < gamepads.length; i++) {
+        if (gamepads[i]) {
+            if (gamepadIndex === null) {
+                gamepadIndex = i;
+                updateGamepadStatus();
+            } else if (gamepadIndex2 === null && i !== gamepadIndex) {
+                gamepadIndex2 = i;
+                updateGamepadStatus();
+            }
+        }
+    }
+}, 500);
 
 function loop(t) { let dt = t - lastTime; if(dt>100) dt=100; lastTime = t; update(dt); draw(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
