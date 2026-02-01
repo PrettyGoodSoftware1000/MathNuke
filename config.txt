@@ -1,5 +1,5 @@
 [Level 0] <LevelStart 0:00>
-[ShipsPerMin 120]
+[ShipsPerMin 130]
 
 [Chargers]
 <speed 150%>
@@ -32,8 +32,8 @@
 [EnergyCapsuleSpeed 3%]
 
 [Event]{
-[0:30]
-[Buggers] <Count 3>
+[0:10]
+[Buggers] <Count 5>
 }
 
 
