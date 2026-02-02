@@ -1,4 +1,4 @@
-[Lives] <10>
+[Lives] <5>
 
 [Level 0] <LevelStart 0:00>
 [ShipsPerMin 120]
