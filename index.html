@@ -1222,7 +1222,7 @@ function drawArrow(x, y, dir) { ctx.lineWidth = 4; ctx.strokeStyle = '#0f0'; ctx
 function drawMathChallenge() {
     if (!mathChallenge.active) return;
     ctx.save(); ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.strokeStyle = "#00ffff"; ctx.lineWidth = 4;
-    let bx = WIDTH/2 - 250, by = HEIGHT/2 - 150; ctx.fillRect(bx, by, 500, 300); ctx.strokeRect(bx, by, 500, 300);
+    let bx = WIDTH/2 - 250, by = HEIGHT/2 - 150; ctx.fillRect(bx, by, 500, 500); ctx.strokeRect(bx, by, 500, 500);
     ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "18px Courier New";
     let ty = by + 50; mathChallenge.customText.forEach(line => { ctx.fillText(line, WIDTH/2, ty); ty += 25; });
     ctx.font = "40px Courier New"; ctx.fillStyle = "#ffff00"; ctx.fillText(`${mathChallenge.num1} x ${mathChallenge.num2} = ?`, WIDTH/2, by + 160);
