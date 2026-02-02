@@ -430,12 +430,12 @@
     
     <div id="content-wrapper">
         <div id="hud">
-            <div id="p1Stats">Reactor Power: 0%<br>Lives: 25</div>
+            <div id="p1Stats">Reactor Power: 0%<br>Lives: <span id="p1-lives">25</span></div>
             <div style="display:flex; flex-direction:column; align-items:center;">
                 <div id="gameTitle" style="color:#ff0055; font-size: 24px; font-weight: bold;">MATH NUKE</div>
                 <div id="levelIndicator" style="color: #ffff00; font-size: 20px; font-weight: bold; margin-top: 4px;">LEVEL 1</div>
             </div>
-            <div id="p2Stats" style="text-align: right;">Reactor Power: 0%<br>Lives: 25</div>
+            <div id="p2Stats" style="text-align: right;">Reactor Power: 0%<br>Lives: <span id="p2-lives">25</span></div>
         </div>
 
         <div id="main-row">
@@ -668,6 +668,7 @@ let p1Selecting = false;
 let p2Selecting = false;
 let highPower = parseInt(localStorage.getItem('galago_high_power')) || 0;
 const BASE_CAPSULE_SPEED = 2.0;
+let defaultLives = 25; // Default lives, can be overridden by config.txt
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const keys = {};
@@ -760,10 +761,13 @@ const assets = {
 };
 
 // --- 4. ENTITIES ---
-const players = [ 
-    { x: 180, y: 470, startY: 470, w: 64, h: 64, lives: 25, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 0, hasNuclearWeapon: false }, 
-    { x: 540, y: 470, startY: 470, w: 64, h: 64, lives: 25, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 0, hasNuclearWeapon: false } 
-];
+function initPlayers() {
+    return [ 
+        { x: 180, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 0, hasNuclearWeapon: false }, 
+        { x: 540, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 0, hasNuclearWeapon: false } 
+    ];
+}
+const players = initPlayers();
 const pBullets = [], eBullets = [], enemies = [], particles = [], capsules = [], activeNukes = [];
 const rockets = [];
 const shockwaves = []; // For nuke shockwave effects
@@ -816,6 +820,7 @@ function parseConfigText(text) {
     const nukeRegex = /<NukeDropChance\s*([\d.]+)%>/i;
     const spmRegex = /\[ShipsPerMin\s+(\d+)\]/i;
     const capsSpeedRegex = /\[EnergyCapsuleSpeed\s*([\d.]+)%\]/i;
+    const livesRegex = /\[Lives\]\s*<(\d+)>/i;
 
     lines.forEach(line => {
         const l = line.trim();
@@ -850,6 +855,8 @@ function parseConfigText(text) {
         if (spmMatch) { let val = parseInt(spmMatch[1]); if (val < 1) val = 1; if (val > 9999) val = 9999; workingConfig.shipsPerMin = val; }
         const capsMatch = l.match(capsSpeedRegex);
         if (capsMatch) { workingConfig.energyCapsuleSpeed = parseFloat(capsMatch[1]) / 100; }
+        const livesMatch = l.match(livesRegex);
+        if (livesMatch) { defaultLives = parseInt(livesMatch[1]); }
 
         const lowerLine = l.toLowerCase();
         if(lowerLine.includes('[chargers]')) { currentSection = 'chargers'; } 
@@ -909,6 +916,14 @@ function setupFileLoader(btnId, inputId, handler) {
 // Config Loader
 setupFileLoader('btnLoadConfig', 'configFile', (text) => {
     parseConfigText(text);
+    // Only update lives if game hasn't started
+    if (!gameStarted) {
+        players[0].lives = defaultLives;
+        players[1].lives = defaultLives;
+        // Update HUD with new lives value
+        document.getElementById('p1Stats').innerHTML = `Reactor Power: ${Math.floor(p1Power)}%<br>Lives: ${defaultLives}`;
+        document.getElementById('p2Stats').innerHTML = `Reactor Power: ${Math.floor(p2Power)}%<br>Lives: ${defaultLives}`;
+    }
     canvas.focus();
 });
 
@@ -928,15 +943,25 @@ setupFileLoader('btnLoadP2', 'p2SpriteInput', (data) => loadSprite(data, 'p2'));
 // Automatic P1/P2 PNG loading from local folder
 window.addEventListener('load', () => {
     // Initialize HUD text immediately
-    document.getElementById('p1Stats').innerHTML = 'Reactor Power: 0%<br>Lives: 25';
-    document.getElementById('p2Stats').innerHTML = 'Reactor Power: 0%<br>Lives: 25';
+    document.getElementById('p1Stats').innerHTML = `Reactor Power: 0%<br>Lives: ${defaultLives}`;
+    document.getElementById('p2Stats').innerHTML = `Reactor Power: 0%<br>Lives: ${defaultLives}`;
     document.getElementById('gameTitle').textContent = 'MATH NUKE';
     document.getElementById('levelIndicator').textContent = 'LEVEL 1';
     
     // Try to load config.txt
     fetch('config.txt?t=' + Date.now())
         .then(res => { if(!res.ok) throw new Error("404"); return res.text(); })
-        .then(text => parseConfigText(text))
+        .then(text => {
+            parseConfigText(text);
+            // Only update lives if game hasn't started
+            if (!gameStarted) {
+                players[0].lives = defaultLives;
+                players[1].lives = defaultLives;
+                // Update HUD with lives from config
+                document.getElementById('p1Stats').innerHTML = `Reactor Power: 0%<br>Lives: ${defaultLives}`;
+                document.getElementById('p2Stats').innerHTML = `Reactor Power: 0%<br>Lives: ${defaultLives}`;
+            }
+        })
         .catch(e => console.log("Manual config load required"));
     
     // Try to load local PNGs if they exist
@@ -1121,6 +1146,13 @@ function launchRockets(p) {
 
 function launchNuke(pIdx) {
     if (players[pIdx].nukes <= 0) return;
+    
+    // Only allow 1 nuke at a time
+    if (activeNukes.length > 0) {
+        showToast("Nuke already in flight!");
+        return;
+    }
+    
     players[pIdx].nukes--; updateNukeDisplay();
     
     // Pick initial target if enemies exist
@@ -1190,7 +1222,7 @@ function drawArrow(x, y, dir) { ctx.lineWidth = 4; ctx.strokeStyle = '#0f0'; ctx
 function drawMathChallenge() {
     if (!mathChallenge.active) return;
     ctx.save(); ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.strokeStyle = "#00ffff"; ctx.lineWidth = 4;
-    let bx = WIDTH/2 - 250, by = HEIGHT/2 - 150; ctx.fillRect(bx, by, 500, 300); ctx.strokeRect(bx, by, 500, 300);
+    let bx = WIDTH/2 - 250, by = HEIGHT/2 - 150; ctx.fillRect(bx, by, 500, 400); ctx.strokeRect(bx, by, 500, 400);
     ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "18px Courier New";
     let ty = by + 50; mathChallenge.customText.forEach(line => { ctx.fillText(line, WIDTH/2, ty); ty += 25; });
     ctx.font = "40px Courier New"; ctx.fillStyle = "#ffff00"; ctx.fillText(`${mathChallenge.num1} x ${mathChallenge.num2} = ?`, WIDTH/2, by + 160);
@@ -1460,7 +1492,7 @@ function update(dt) {
         if(e.flashTimer > 0) e.flashTimer--;
         for(let bIdx=pBullets.length-1; bIdx>=0; bIdx--) {
             let b = pBullets[bIdx];
-            if(rectIntersect(e, b)) { e.hp--; pBullets.splice(bIdx, 1); if(e.hp > 0) { e.flashTimer = 5; } else { if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; let configName = e.type + 's'; if(e.type === 'fatty') configName = 'fatties'; let chance = (enemyConfig[configName] && enemyConfig[configName].dropChance) || 0; if (Math.random() < chance) capsules.push({ x: e.x + e.w/2 - 8, y: e.y, w: 16, h: 24, type: 'energy' }); let nukeChance = (enemyConfig[configName] && enemyConfig[configName].nukeChance) || 0; if (Math.random() < nukeChance) capsules.push({ x: e.x + e.w/2 - 16, y: e.y, w: 32, h: 32, type: 'nuke' }); createExplosion(e.x+e.w/2, e.y+e.h/2, e.color); sfx.explosion(e.type); enemies.splice(i, 1); } break; }
+            if(rectIntersect(e, b)) { e.hp--; pBullets.splice(bIdx, 1); if(e.hp > 0) { e.flashTimer = 5; } else { if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; let configName = e.type + 's'; if(e.type === 'fatty') configName = 'fatties'; let chance = (enemyConfig[configName] && enemyConfig[configName].dropChance) || 0; if (Math.random() < chance) capsules.push({ x: e.x + e.w/2 - 8, y: e.y, w: 16, h: 24, type: 'energy' }); let nukeChance = (enemyConfig[configName] && enemyConfig[configName].nukeChance) || 0; let anyPlayerHasNukes = players[0].hasNuclearWeapon || players[1].hasNuclearWeapon; if (anyPlayerHasNukes && Math.random() < nukeChance) capsules.push({ x: e.x + e.w/2 - 16, y: e.y, w: 32, h: 32, type: 'nuke' }); createExplosion(e.x+e.w/2, e.y+e.h/2, e.color); sfx.explosion(e.type); enemies.splice(i, 1); } break; }
         }
         if (e.type === 'charger') { players.forEach(p => { if(!p.dead && p.state === 'active' && rectIntersect(p, e)) { handlePlayerHit(p); if(p.state === 'respawning') enemies.splice(i, 1); } }); }
         if(e.y > HEIGHT) { if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; enemies.splice(i, 1); }
@@ -1483,7 +1515,9 @@ function update(dt) {
                     let chance = (enemyConfig[configName] && enemyConfig[configName].dropChance) || 0; 
                     if (Math.random() < chance) capsules.push({ x: e.x + e.w/2 - 8, y: e.y, w: 16, h: 24, type: 'energy' }); 
                     let nukeChance = (enemyConfig[configName] && enemyConfig[configName].nukeChance) || 0; 
-                    if (Math.random() < nukeChance) capsules.push({ x: e.x + e.w/2 - 16, y: e.y, w: 32, h: 32, type: 'nuke' }); 
+                    // Only drop nukes if at least one player has unlocked nuclear weapon
+                    let anyPlayerHasNukes = players[0].hasNuclearWeapon || players[1].hasNuclearWeapon;
+                    if (anyPlayerHasNukes && Math.random() < nukeChance) capsules.push({ x: e.x + e.w/2 - 16, y: e.y, w: 32, h: 32, type: 'nuke' }); 
                     createExplosion(e.x+e.w/2, e.y+e.h/2, e.color); 
                     sfx.explosion(e.type); 
                     enemies.splice(i, 1); 
