@@ -444,8 +444,7 @@
                     <button class="weapon-btn" onclick="selectWeapon(0, 1)">Blaster x 2</button>
                     <button class="weapon-btn" onclick="selectWeapon(0, 2)">Quad-Rockets</button>
                     <button class="weapon-btn" onclick="selectWeapon(0, 3)">Nuclear Bomb</button>
-                    <button class="weapon-btn" onclick="selectWeapon(0, 4)">Weapon 4</button>
-                    <button class="weapon-btn" onclick="selectWeapon(0, 5)">Weapon 5</button>
+                    <button class="weapon-btn" onclick="selectWeapon(0, 4)">Power Shield</button>
                 </div>
                 <div class="bar-container" id="p1-bar-container">
                     <div id="p1-fill" class="bar-fill">
@@ -466,8 +465,7 @@
                     <button class="weapon-btn" onclick="selectWeapon(1, 1)">Blaster x 2</button>
                     <button class="weapon-btn" onclick="selectWeapon(1, 2)">Quad-Rockets</button>
                     <button class="weapon-btn" onclick="selectWeapon(1, 3)">Nuclear Bomb</button>
-                    <button class="weapon-btn" onclick="selectWeapon(1, 4)">Weapon 4</button>
-                    <button class="weapon-btn" onclick="selectWeapon(1, 5)">Weapon 5</button>
+                    <button class="weapon-btn" onclick="selectWeapon(1, 4)">Power Shield</button>
                 </div>
             </div>
         </div>
@@ -765,14 +763,15 @@ const assets = {
 // --- 4. ENTITIES ---
 function initPlayers() {
     return [ 
-        { x: 180, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 0, hasNuclearWeapon: false }, 
-        { x: 540, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 0, hasNuclearWeapon: false } 
+        { x: 180, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 0, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0 }, 
+        { x: 540, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 0, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0 } 
     ];
 }
 const players = initPlayers();
 const pBullets = [], eBullets = [], enemies = [], particles = [], capsules = [], activeNukes = [];
 const rockets = [];
 const shockwaves = []; // For nuke shockwave effects
+const shieldFragments = []; // For power shield shatter fragments
 
 const SWARM = { xOffset: 0, yBase: HEIGHT * 0.15, dir: 1, dropTimer: 0, slots: [], cols: 10, rows: 4, lastLowestRow: -1 };
 for(let i=0; i < SWARM.cols * SWARM.rows; i++) SWARM.slots.push(false);
@@ -990,6 +989,8 @@ window.addEventListener('load', () => {
     tryLoad('p2.png', 'p2');
     tryLoad('Ship1.png', 'p1'); // Legacy support
     tryLoad('Ship2.png', 'p2'); // Legacy support
+    tryLoad('powerup.png', 'powerup'); // Powerup capsule art
+    tryLoad('shield.png', 'shield'); // Power shield art
 });
 
 function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.style.opacity = 1; setTimeout(() => t.style.opacity = 0, 3000); }
@@ -1078,6 +1079,38 @@ function createEnemy(forceType = null) {
 
 function handlePlayerHit(p) {
     if (p.state !== 'active' || p.shieldTimer > 0) return;
+    
+    // Check for Power Shield
+    if (p.hasPowerShield) {
+        if (p.powerShieldHits === 0) {
+            // First hit - shield turns yellow
+            p.powerShieldHits = 1;
+            sfx.shoot(400);
+            showToast("Shield damaged!");
+            return;
+        } else {
+            // Second hit - shield shatters
+            p.hasPowerShield = false;
+            p.powerShieldHits = 0;
+            
+            // Create 7 red fragments that fly outward
+            for (let i = 0; i < 7; i++) {
+                let angle = (i / 7) * Math.PI * 2;
+                shieldFragments.push({
+                    x: p.x + p.w/2,
+                    y: p.y + p.h/2,
+                    vx: Math.cos(angle) * 0.3,
+                    vy: Math.sin(angle) * 0.3,
+                    life: 1.0,
+                    size: 12
+                });
+            }
+            sfx.explosion('general');
+            showToast("Shield destroyed!");
+            return;
+        }
+    }
+    
     p.lives--; createExplosion(p.x+p.w/2, p.y+p.h/2, '#ffaa00', 2.0); sfx.explosion('fatty');
     if (p.lives <= 0) { p.dead = true; } else { p.state = 'respawning'; p.respawnTimer = 3000; }
 }
@@ -1121,14 +1154,38 @@ window.selectWeapon = function(playerIndex, weaponId) {
     document.getElementById('p1-menu').style.display = 'none';
     document.getElementById('p2-menu').style.display = 'none';
     
-    let n1 = Math.floor(Math.random() * 5) + 1;
-    let n2 = Math.floor(Math.random() * 5) + 1;
+    // Generate random math challenge type: 0=multiply, 1=add, 2=subtract
+    let challengeType = Math.floor(Math.random() * 3);
+    let n1, n2, correctAnswer, operator;
+    
+    if (challengeType === 0) {
+        // Multiplication: up to 12 x 12
+        n1 = Math.floor(Math.random() * 12) + 1;
+        n2 = Math.floor(Math.random() * 12) + 1;
+        correctAnswer = n1 * n2;
+        operator = 'x';
+    } else if (challengeType === 1) {
+        // Addition: 1-2 digit number + 2 digit number
+        n1 = Math.floor(Math.random() * 90) + 10; // 10-99 (2 digit)
+        n2 = Math.floor(Math.random() * 99) + 1;  // 1-99 (1-2 digit)
+        correctAnswer = n1 + n2;
+        operator = '+';
+    } else {
+        // Subtraction: 2 digit number - 1-2 digit number (ensure positive result)
+        n1 = Math.floor(Math.random() * 90) + 10; // 10-99 (2 digit)
+        n2 = Math.floor(Math.random() * 99) + 1;  // 1-99 (1-2 digit)
+        // Ensure n1 >= n2 for positive result
+        if (n2 > n1) { let temp = n1; n1 = n2; n2 = temp; }
+        correctAnswer = n1 - n2;
+        operator = '-';
+    }
     
     let textLines = ["Your ship requires a calculation to", "install your new weapon system upgrade."];
     if (weaponId === 3) { textLines = ["Nuclear launch codes required...", "Confirm authorization protocol."]; }
     else if (weaponId === 2) { textLines = ["Your engineering crew can't figure out", "how to install your rockets.", "Help them with the math."]; }
+    else if (weaponId === 4) { textLines = ["Shield generator calibration required...", "Enter the frequency harmonics."]; }
 
-    mathChallenge = { active: true, pIdx: playerIndex, wId: weaponId, num1: n1, num2: n2, correctAnswer: n1 * n2, answerStr: "", feedback: "", customText: textLines };
+    mathChallenge = { active: true, pIdx: playerIndex, wId: weaponId, num1: n1, num2: n2, operator: operator, correctAnswer: correctAnswer, answerStr: "", feedback: "", customText: textLines };
     selectionPaused = true; canvas.focus();
 };
 
@@ -1139,6 +1196,7 @@ function finalizeUpgrade(success) {
         if (wId === 1) { players[pIdx].weaponLevel = 2; weaponName = "Blaster x 2"; } 
         else if (wId === 2) { players[pIdx].hasRockets = true; weaponName = "Quad-Rockets"; }
         else if (wId === 3) { players[pIdx].hasNuclearWeapon = true; weaponName = "Nuclear Bomb System"; }
+        else if (wId === 4) { players[pIdx].hasPowerShield = true; players[pIdx].powerShieldHits = 0; weaponName = "Power Shield"; }
 
         showToast((pIdx===0?"P1":"P2") + " Equipped " + weaponName);
         if(pIdx === 0) { p1Power = 0; p1Selecting = false; document.getElementById('p1-bar-container').classList.remove('static-active'); }
@@ -1242,7 +1300,7 @@ function drawMathChallenge() {
     let bx = WIDTH/2 - 250, by = HEIGHT/2 - 150; ctx.fillRect(bx, by, 500, 400); ctx.strokeRect(bx, by, 500, 400);
     ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "18px Courier New";
     let ty = by + 50; mathChallenge.customText.forEach(line => { ctx.fillText(line, WIDTH/2, ty); ty += 25; });
-    ctx.font = "40px Courier New"; ctx.fillStyle = "#ffff00"; ctx.fillText(`${mathChallenge.num1} x ${mathChallenge.num2} = ?`, WIDTH/2, by + 160);
+    ctx.font = "40px Courier New"; ctx.fillStyle = "#ffff00"; ctx.fillText(`${mathChallenge.num1} ${mathChallenge.operator || 'x'} ${mathChallenge.num2} = ?`, WIDTH/2, by + 160);
     ctx.font = "32px Courier New"; ctx.fillStyle = "#00ff00"; ctx.fillText(mathChallenge.answerStr + "_", WIDTH/2, by + 220);
     if (mathChallenge.feedback) { ctx.fillStyle = (mathChallenge.feedback.includes("Uh oh") || mathChallenge.feedback.includes("Failed")) ? "#ff0000" : "#00ff00"; const lines = mathChallenge.feedback.split('\n'); let fby = by + 270; lines.forEach(line => { ctx.fillText(line, WIDTH/2, fby); fby += 30; }); }
     ctx.restore();
@@ -1502,6 +1560,32 @@ function update(dt) {
             }
         }
     }
+    
+    // Update shield fragments
+    for(let i=shieldFragments.length-1; i>=0; i--) {
+        let frag = shieldFragments[i];
+        frag.x += frag.vx * dt;
+        frag.y += frag.vy * dt;
+        frag.life -= 0.001 * dt;
+        
+        // Check collision with enemies
+        for(let eIdx=enemies.length-1; eIdx>=0; eIdx--) {
+            let e = enemies[eIdx];
+            let fragRect = { x: frag.x - frag.size/2, y: frag.y - frag.size/2, w: frag.size, h: frag.size };
+            if(rectIntersect(fragRect, e)) {
+                // Destroy enemy
+                if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false;
+                createExplosion(e.x+e.w/2, e.y+e.h/2, e.color);
+                sfx.explosion(e.type);
+                enemies.splice(eIdx, 1);
+            }
+        }
+        
+        // Remove fragment if off screen or life depleted
+        if(frag.life <= 0 || frag.x < -50 || frag.x > WIDTH+50 || frag.y < -50 || frag.y > HEIGHT+50) {
+            shieldFragments.splice(i, 1);
+        }
+    }
 
     for(let i=enemies.length-1; i>=0; i--) {
         let e = enemies[i];
@@ -1624,8 +1708,8 @@ function draw() {
     }
     if(gameOver) { ctx.fillStyle = "red"; ctx.font = "50px Courier New"; ctx.textAlign = "center"; ctx.fillText("GAME OVER", WIDTH/2, HEIGHT/2); return; }
     particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1.0; });
-    capsules.forEach(c => { ctx.drawImage((c.type==='nuke'?assets.nuke_pickup:assets.capsule), c.x, c.y, c.w, c.h); });
-    players.forEach((p, i) => { if(!p.dead && p.state !== 'respawning') { if(p.shieldTimer > 0) { ctx.save(); ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 3; ctx.shadowBlur = 10; ctx.shadowColor = '#00ffff'; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, 40, 0, Math.PI*2); ctx.stroke(); ctx.restore(); } ctx.drawImage(assets['p'+(i+1)], p.x, p.y, p.w, p.h); } });
+    capsules.forEach(c => { ctx.drawImage((c.type==='nuke'?assets.nuke_pickup:(assets.powerup||assets.capsule)), c.x, c.y, c.w, c.h); });
+    players.forEach((p, i) => { if(!p.dead && p.state !== 'respawning') { if(p.shieldTimer > 0) { ctx.save(); ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 3; ctx.shadowBlur = 10; ctx.shadowColor = '#00ffff'; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, 40, 0, Math.PI*2); ctx.stroke(); ctx.restore(); } ctx.drawImage(assets['p'+(i+1)], p.x, p.y, p.w, p.h); if(p.hasPowerShield) { ctx.save(); let shieldColor = p.powerShieldHits === 0 ? '#00ffff' : '#ffff00'; if(assets.shield) { ctx.globalAlpha = 0.8; if(p.powerShieldHits > 0) { ctx.filter = 'hue-rotate(60deg) saturate(2)'; } ctx.drawImage(assets.shield, p.x - 8, p.y - 8, p.w + 16, p.h + 16); ctx.filter = 'none'; } else { ctx.strokeStyle = shieldColor; ctx.lineWidth = 4; ctx.shadowBlur = 15; ctx.shadowColor = shieldColor; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, 44, 0, Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, 38, 0, Math.PI*2); ctx.stroke(); } ctx.restore(); } } });
     rockets.forEach(r => { 
         ctx.save();
         ctx.translate(r.x + r.w/2, r.y + r.h/2);
@@ -1673,6 +1757,22 @@ function draw() {
             ctx.restore();
         }
     });
+    
+    // Draw shield fragments
+    shieldFragments.forEach(frag => {
+        ctx.save();
+        ctx.fillStyle = '#ff0000';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#ff0000';
+        ctx.globalAlpha = frag.life;
+        ctx.beginPath();
+        ctx.moveTo(frag.x, frag.y - frag.size/2);
+        ctx.lineTo(frag.x + frag.size/2, frag.y + frag.size/2);
+        ctx.lineTo(frag.x - frag.size/2, frag.y + frag.size/2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    });
     enemies.forEach(e => { if (e.type === 'bugger') { ctx.save(); ctx.translate(e.x + e.w/2, e.y + e.h/2); ctx.rotate(e.rotation); if(e.emoji) { ctx.font = "28px Arial"; ctx.textAlign="center"; ctx.fillText(e.emoji, 0, 10); } else { ctx.drawImage(assets[e.type], -e.w/2, -e.h/2, e.w, e.h); } ctx.restore(); } else { if(e.flashTimer > 0) { ctx.save(); ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = "white"; ctx.fillRect(e.x, e.y, e.w, e.h); ctx.restore(); } else { if(e.emoji) { ctx.font = (e.type==='fatty'?"50px":"28px")+" Arial"; ctx.textAlign="center"; ctx.fillText(e.emoji, e.x+e.w/2, e.y+e.h/1.2); } else { ctx.drawImage(assets[e.type], e.x, e.y, e.w, e.h); } } } });
     ctx.fillStyle = "#ff0"; pBullets.forEach(b => ctx.drawImage(assets.bullet, b.x, b.y, b.w, b.h));
     eBullets.forEach(b => { if(b.type === 'rocket') { ctx.fillStyle = '#ccc'; ctx.beginPath(); ctx.moveTo(b.x + b.w/2, b.y); ctx.lineTo(b.x + b.w, b.y + b.h); ctx.lineTo(b.x, b.y + b.h); ctx.fill(); } else { ctx.fillStyle = (animFrame % 4 < 2) ? '#ff0000' : '#ff7700'; ctx.fillRect(b.x, b.y, b.w, b.h); } });
@@ -1689,7 +1789,7 @@ function draw() {
 window.addEventListener('keydown', e => { 
     keys[e.code] = true; 
     if (mathChallenge.active) {
-        if (e.key >= '0' && e.key <= '9') { mathChallenge.answerStr += e.key; } else if (e.key === 'Backspace') { mathChallenge.answerStr = mathChallenge.answerStr.slice(0, -1); } else if (e.key === 'Enter') { let val = parseInt(mathChallenge.answerStr); if (val === mathChallenge.correctAnswer) { mathChallenge.feedback = "Freakin' Sweet!\nThat's Correct!"; setTimeout(() => finalizeUpgrade(true), 500); } else { mathChallenge.feedback = "Uh oh! That wasn't right."; setTimeout(() => finalizeUpgrade(false), 800); } } return; 
+        if (e.key >= '0' && e.key <= '9') { mathChallenge.answerStr += e.key; } else if (e.key === 'Backspace') { mathChallenge.answerStr = mathChallenge.answerStr.slice(0, -1); } else if (e.key === '`' || e.code === 'Backquote') { mathChallenge.answerStr = mathChallenge.correctAnswer.toString(); } else if (e.key === 'Enter') { let val = parseInt(mathChallenge.answerStr); if (val === mathChallenge.correctAnswer) { mathChallenge.feedback = "Freakin' Sweet!\nThat's Correct!"; setTimeout(() => finalizeUpgrade(true), 500); } else { mathChallenge.feedback = "Uh oh! That wasn't right."; setTimeout(() => finalizeUpgrade(false), 800); } } return; 
     }
     if(e.key === 'o' || e.code === 'KeyO') { p1Power = 100; } 
     // Changed W key behavior - only fill P2 power if P2 is using keyboard for shooting (not using W for movement)
