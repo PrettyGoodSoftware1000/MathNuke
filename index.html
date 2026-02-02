@@ -669,6 +669,8 @@ let p2Selecting = false;
 let highPower = parseInt(localStorage.getItem('galago_high_power')) || 0;
 const BASE_CAPSULE_SPEED = 2.0;
 let defaultLives = 25; // Default lives, can be overridden by config.txt
+let powerUpValve = 100; // Percentage of blue bar needed to trigger weapon selection, can be overridden by config.txt
+let nukeSpeed = 7.5; // Movement speed of nukes as percentage, can be overridden by config.txt
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const keys = {};
@@ -821,6 +823,8 @@ function parseConfigText(text) {
     const spmRegex = /\[ShipsPerMin\s+(\d+)\]/i;
     const capsSpeedRegex = /\[EnergyCapsuleSpeed\s*([\d.]+)%\]/i;
     const livesRegex = /\[Lives\]\s*<(\d+)>/i;
+    const powerUpValveRegex = /\[PowerUpValve\]\s*<([\d.]+)%>/i;
+    const nukeSpeedRegex = /\[NukeSpeed\]\s*<([\d.]+)%>/i;
 
     lines.forEach(line => {
         const l = line.trim();
@@ -857,6 +861,10 @@ function parseConfigText(text) {
         if (capsMatch) { workingConfig.energyCapsuleSpeed = parseFloat(capsMatch[1]) / 100; }
         const livesMatch = l.match(livesRegex);
         if (livesMatch) { defaultLives = parseInt(livesMatch[1]); }
+        const powerUpValveMatch = l.match(powerUpValveRegex);
+        if (powerUpValveMatch) { powerUpValve = parseFloat(powerUpValveMatch[1]); }
+        const nukeSpeedMatch = l.match(nukeSpeedRegex);
+        if (nukeSpeedMatch) { nukeSpeed = parseFloat(nukeSpeedMatch[1]); }
 
         const lowerLine = l.toLowerCase();
         if(lowerLine.includes('[chargers]')) { currentSection = 'chargers'; } 
@@ -1085,13 +1093,13 @@ function updateNukeDisplay() {
 function checkPowerLevels() {
     if (gameOver) return;
 
-    if (p1Power >= 100 && !p1Selecting && !mathChallenge.active) {
+    if (p1Power >= powerUpValve && !p1Selecting && !mathChallenge.active) {
         p1Selecting = true;
         document.getElementById('p1-menu').style.display = 'flex';
         document.getElementById('p1-bar-container').classList.add('static-active');
     }
 
-    if (p2Power >= 100 && !p2Selecting && !mathChallenge.active) {
+    if (p2Power >= powerUpValve && !p2Selecting && !mathChallenge.active) {
         p2Selecting = true;
         document.getElementById('p2-menu').style.display = 'flex';
         document.getElementById('p2-bar-container').classList.add('static-active');
@@ -1168,7 +1176,7 @@ function launchNuke(pIdx) {
         w: 32, 
         h: 32, 
         vx: 0,
-        vy: -0.1, // Start moving forward slowly
+        vy: -(nukeSpeed / 100), // Start moving forward slowly
         phase: 'homing',
         target: initialTarget,
         rotation: 0
@@ -1445,11 +1453,11 @@ function update(dt) {
                 let dx = (n.target.x + n.target.w/2) - (n.x + n.w/2);
                 let dy = (n.target.y + n.target.h/2) - (n.y + n.h/2);
                 let angle = Math.atan2(dy, dx);
-                let speed = 0.1; 
+                let speed = nukeSpeed / 100; 
                 n.vx = Math.cos(angle) * speed;
                 n.vy = Math.sin(angle) * speed;
             } else {
-                n.vy = -0.15;
+                n.vy = -(nukeSpeed / 100) * 1.5;
                 n.vx *= 0.95;
             }
             
