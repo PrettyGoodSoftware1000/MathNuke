@@ -862,9 +862,15 @@ function parseConfigText(text) {
         const livesMatch = l.match(livesRegex);
         if (livesMatch) { defaultLives = parseInt(livesMatch[1]); }
         const powerUpValveMatch = l.match(powerUpValveRegex);
-        if (powerUpValveMatch) { powerUpValve = parseFloat(powerUpValveMatch[1]); }
+        if (powerUpValveMatch) { 
+            powerUpValve = parseFloat(powerUpValveMatch[1]); 
+            console.log('PowerUpValve set to:', powerUpValve);
+        }
         const nukeSpeedMatch = l.match(nukeSpeedRegex);
-        if (nukeSpeedMatch) { nukeSpeed = parseFloat(nukeSpeedMatch[1]); }
+        if (nukeSpeedMatch) { 
+            nukeSpeed = parseFloat(nukeSpeedMatch[1]); 
+            console.log('NukeSpeed set to:', nukeSpeed);
+        }
 
         const lowerLine = l.toLowerCase();
         if(lowerLine.includes('[chargers]')) { currentSection = 'chargers'; } 
@@ -893,6 +899,7 @@ function parseConfigText(text) {
     if (currentLevelStartTime !== -1) { levelTimeline.push({ time: currentLevelStartTime, name: currentLevelLabel, config: cloneConfig(workingConfig) }); }
     levelTimeline.sort((a,b) => a.time - b.time);
     eventTimeline.sort((a,b) => a.time - b.time);
+    console.log('Config parsed - PowerUpValve:', powerUpValve, 'NukeSpeed:', nukeSpeed);
     showToast(`Config Loaded! (${levelTimeline.length} Levels, ${eventTimeline.length} Events)`);
     
     if (!gameStarted && levelTimeline.length > 0) {
@@ -1094,12 +1101,14 @@ function checkPowerLevels() {
     if (gameOver) return;
 
     if (p1Power >= powerUpValve && !p1Selecting && !mathChallenge.active) {
+        console.log(`P1 Menu triggered! p1Power: ${p1Power}, powerUpValve: ${powerUpValve}`);
         p1Selecting = true;
         document.getElementById('p1-menu').style.display = 'flex';
         document.getElementById('p1-bar-container').classList.add('static-active');
     }
 
     if (p2Power >= powerUpValve && !p2Selecting && !mathChallenge.active) {
+        console.log(`P2 Menu triggered! p2Power: ${p2Power}, powerUpValve: ${powerUpValve}`);
         p2Selecting = true;
         document.getElementById('p2-menu').style.display = 'flex';
         document.getElementById('p2-bar-container').classList.add('static-active');
