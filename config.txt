@@ -1,6 +1,6 @@
 [Lives] <5>
 
-[PowerUpValve] <100%>
+[PowerUpValve] <50%>
 [NukeSpeed] <7.5%>
 
 [Level 0] <LevelStart 0:00>
