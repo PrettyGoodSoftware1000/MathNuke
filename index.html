@@ -669,7 +669,7 @@ let p2Selecting = false;
 let highPower = parseInt(localStorage.getItem('galago_high_power')) || 0;
 const BASE_CAPSULE_SPEED = 2.0;
 let defaultLives = 25; // Default lives, can be overridden by config.txt
-let powerUpValve = 100; // Percentage of blue bar needed to trigger weapon selection, can be overridden by config.txt
+let powerUpValve = 100; // How much % each energy capsule fills the bar (menu triggers at 100%), can be overridden by config.txt
 let nukeSpeed = 7.5; // Movement speed of nukes as percentage, can be overridden by config.txt
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1100,15 +1100,15 @@ function updateNukeDisplay() {
 function checkPowerLevels() {
     if (gameOver) return;
 
-    if (p1Power >= powerUpValve && !p1Selecting && !mathChallenge.active) {
-        console.log(`P1 Menu triggered! p1Power: ${p1Power}, powerUpValve: ${powerUpValve}`);
+    if (p1Power >= 100 && !p1Selecting && !mathChallenge.active) {
+        console.log(`P1 Menu triggered! p1Power: ${p1Power}`);
         p1Selecting = true;
         document.getElementById('p1-menu').style.display = 'flex';
         document.getElementById('p1-bar-container').classList.add('static-active');
     }
 
-    if (p2Power >= powerUpValve && !p2Selecting && !mathChallenge.active) {
-        console.log(`P2 Menu triggered! p2Power: ${p2Power}, powerUpValve: ${powerUpValve}`);
+    if (p2Power >= 100 && !p2Selecting && !mathChallenge.active) {
+        console.log(`P2 Menu triggered! p2Power: ${p2Power}`);
         p2Selecting = true;
         document.getElementById('p2-menu').style.display = 'flex';
         document.getElementById('p2-bar-container').classList.add('static-active');
@@ -1564,12 +1564,12 @@ function update(dt) {
             let p = players[pIdx];
             if(!p.dead && p.state === 'active' && rectIntersect(p, c)) {
                 if (c.type === 'energy') { 
-                    let val = Math.floor(Math.random() * 11) + 10; 
-                    if(pIdx === 0) p1Power += val; 
-                    else p2Power += val; 
+                    // Fill bar to powerUpValve amount (no randomization)
+                    if(pIdx === 0) p1Power += powerUpValve; 
+                    else p2Power += powerUpValve; 
                     if(p1Power > 100) p1Power = 100; 
                     if(p2Power > 100) p2Power = 100; 
-                    showFloatingText(pIdx, val + '%'); 
+                    showFloatingText(pIdx, powerUpValve + '%'); 
                     sfx.explosion('capsule'); 
                 } else if (c.type === 'nuke') { 
                     if (players[pIdx].nukes < 3) { 
