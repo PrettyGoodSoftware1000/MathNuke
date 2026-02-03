@@ -1185,6 +1185,25 @@ function getShipsPerMinBoost() {
     return boost;
 }
 
+// Calculate power up drop rate multiplier based on upgrades
+// Goes from 1.0 (0 upgrades) to 0.05 (all upgrades)
+const MAX_UPGRADES = 13; // Total possible upgrades
+function getDropRateMultiplier() {
+    // Get the max upgrades across all players
+    let maxUpgrades = 0;
+    players.forEach(p => {
+        if (!p.dead) {
+            let upgrades = countUpgrades(p);
+            if (upgrades > maxUpgrades) maxUpgrades = upgrades;
+        }
+    });
+    
+    // Linear interpolation from 1.0 to 0.05
+    // At 0 upgrades: 1.0, at MAX_UPGRADES: 0.05
+    let multiplier = 1 - (maxUpgrades / MAX_UPGRADES) * 0.95;
+    return multiplier;
+}
+
 function handlePlayerHit(p, pIdx) {
     if (p.state !== 'active' || p.shieldTimer > 0) return;
     
@@ -1450,7 +1469,7 @@ function finalizeUpgrade(success) {
         else if (wId === 100) {
             p.nukes = p.maxNukes;
             weaponName = "NUKES RELOADED!";
-            levelMessage = "MUUUUUUUUSTAAAAARRRRDDDD!";
+            levelMessage = "Muusstaaarrrd!!!";
             levelMessageTimer = 1500; // Total time for 3 flashes
             mustardFlashCount = 0;
             mustardFlashTimer = 0;
@@ -1600,10 +1619,10 @@ function updateWeaponMenuButtons() {
             menu.appendChild(btn);
         }
         
-        // Check if all other upgrades are unlocked for Reload Nukes
+        // Reload Nukes is always available once fully upgraded (repeatable)
         let allUpgraded = p.hasSpreadBlaster && p.hasRockets && p.hasNuclearWeapon && 
                           p.hasClusterNukes && p.hasPowerShield && p.maxNukes >= 13;
-        if (allUpgraded && p.nukes < p.maxNukes) {
+        if (allUpgraded) {
             let btn = document.createElement('button');
             btn.className = 'weapon-btn';
             btn.style.backgroundColor = '#550055';
@@ -1861,7 +1880,7 @@ function update(dt) {
     if(levelMessageTimer > 0) {
         levelMessageTimer -= dt;
         // Handle mustard flashing
-        if (levelMessage === "MUUUUUUUUSTAAAAARRRRDDDD!") {
+        if (levelMessage === "Muusstaaarrrd!!!") {
             mustardFlashTimer += dt;
             if (mustardFlashTimer >= 250) { // Flash every 250ms
                 mustardFlashTimer = 0;
@@ -2223,7 +2242,7 @@ function update(dt) {
         if(e.flashTimer > 0) e.flashTimer--;
         for(let bIdx=pBullets.length-1; bIdx>=0; bIdx--) {
             let b = pBullets[bIdx];
-            if(rectIntersect(e, b)) { e.hp--; pBullets.splice(bIdx, 1); if(e.hp > 0) { e.flashTimer = 5; } else { if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; let configName = e.type + 's'; if(e.type === 'fatty') configName = 'fatties'; let chance = (enemyConfig[configName] && enemyConfig[configName].dropChance) || 0; if (Math.random() < chance) capsules.push({ x: e.x + e.w/2 - 8, y: e.y, w: 16, h: 24, type: 'energy' }); let nukeChance = (enemyConfig[configName] && enemyConfig[configName].nukeChance) || 0; let anyPlayerHasNukes = players[0].hasNuclearWeapon || players[1].hasNuclearWeapon; if (anyPlayerHasNukes && Math.random() < nukeChance) capsules.push({ x: e.x + e.w/2 - 16, y: e.y, w: 32, h: 32, type: 'nuke' }); createExplosion(e.x+e.w/2, e.y+e.h/2, e.color); sfx.explosion(e.type); enemies.splice(i, 1); } break; }
+            if(rectIntersect(e, b)) { e.hp--; pBullets.splice(bIdx, 1); if(e.hp > 0) { e.flashTimer = 5; } else { if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; let configName = e.type + 's'; if(e.type === 'fatty') configName = 'fatties'; let baseChance = (enemyConfig[configName] && enemyConfig[configName].dropChance) || 0; let chance = baseChance * getDropRateMultiplier(); if (Math.random() < chance) capsules.push({ x: e.x + e.w/2 - 8, y: e.y, w: 16, h: 24, type: 'energy' }); let nukeChance = (enemyConfig[configName] && enemyConfig[configName].nukeChance) || 0; let anyPlayerHasNukes = players[0].hasNuclearWeapon || players[1].hasNuclearWeapon; if (anyPlayerHasNukes && Math.random() < nukeChance) capsules.push({ x: e.x + e.w/2 - 16, y: e.y, w: 32, h: 32, type: 'nuke' }); createExplosion(e.x+e.w/2, e.y+e.h/2, e.color); sfx.explosion(e.type); enemies.splice(i, 1); } break; }
         }
         if (e.type === 'charger') { players.forEach((p, pIdx) => { if(!p.dead && p.state === 'active' && rectIntersect(p, e)) { handlePlayerHit(p, pIdx); if(p.state === 'respawning') enemies.splice(i, 1); } }); }
         if(e.y > HEIGHT) { if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; enemies.splice(i, 1); }
@@ -2243,7 +2262,8 @@ function update(dt) {
                     if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false; 
                     let configName = e.type + 's'; 
                     if(e.type === 'fatty') configName = 'fatties'; 
-                    let chance = (enemyConfig[configName] && enemyConfig[configName].dropChance) || 0; 
+                    let baseChance = (enemyConfig[configName] && enemyConfig[configName].dropChance) || 0;
+                    let chance = baseChance * getDropRateMultiplier(); // Decreases with more upgrades
                     if (Math.random() < chance) capsules.push({ x: e.x + e.w/2 - 8, y: e.y, w: 16, h: 24, type: 'energy' }); 
                     let nukeChance = (enemyConfig[configName] && enemyConfig[configName].nukeChance) || 0; 
                     // Only drop nukes if at least one player has unlocked nuclear weapon
@@ -2427,7 +2447,7 @@ function draw() {
     if(showTimer) { ctx.save(); ctx.fillStyle = "#ff0"; ctx.font = "24px Courier New"; ctx.textAlign = "left"; ctx.fillText(formatTimer(gameTime), 10, 30); ctx.restore(); }
     if(levelMessageTimer > 0) { 
         // Special handling for MUSTARD message
-        if (levelMessage === "MUUUUUUUUSTAAAAARRRRDDDD!" && mustardFlashCount % 2 === 0) {
+        if (levelMessage === "Muusstaaarrrd!!!" && mustardFlashCount % 2 === 0) {
             // Only show on even counts (0,2,4 = flash visible)
             ctx.save(); 
             ctx.fillStyle = "#ff00ff"; 
@@ -2439,7 +2459,7 @@ function draw() {
             // Position outside game window (above it)
             ctx.fillText(levelMessage, WIDTH/2, -40); 
             ctx.restore();
-        } else if (levelMessage !== "MUUUUUUUUSTAAAAARRRRDDDD!") {
+        } else if (levelMessage !== "Muusstaaarrrd!!!") {
             // Normal level messages
             ctx.save(); 
             ctx.fillStyle = "#0f0"; 
