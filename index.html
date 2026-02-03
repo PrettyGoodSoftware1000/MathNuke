@@ -179,6 +179,31 @@
             filter: drop-shadow(0 0 3px #ffff00);
         }
 
+        #rocket-inventory-container {
+            width: 720px;
+            margin: 5px auto 0 auto;
+            display: flex;
+            justify-content: space-between;
+            height: 30px;
+        }
+        .rocket-slot {
+            display: flex;
+            gap: 3px;
+            align-items: center;
+        }
+        .rocket-icon {
+            width: 12px;
+            height: 24px;
+            display: inline-block;
+            background: linear-gradient(to bottom, #888 0%, #aaa 30%, #ff4400 70%, #ff0000 100%);
+            border-radius: 3px 3px 0 0;
+            opacity: 0.3;
+        }
+        .rocket-icon.rocket-ready {
+            opacity: 1;
+            filter: drop-shadow(0 0 3px #ff6600);
+        }
+
         .controls-info {
             background: #333; 
             padding: 10px; 
@@ -474,6 +499,11 @@
             <div id="p1-nukes" class="nuke-slot"></div>
             <div id="p2-nukes" class="nuke-slot" style="justify-content: flex-end;"></div>
         </div>
+        
+        <div id="rocket-inventory-container">
+            <div id="p1-rockets" class="rocket-slot"></div>
+            <div id="p2-rockets" class="rocket-slot" style="justify-content: flex-end;"></div>
+        </div>
 
         <div class="controls-info" id="controls-info"><strong>P1:</strong> Arrows/Shift/Z(Rockets)/X(Nuke) | <strong>P2:</strong> Stick/A | <strong>O</strong> Fill Power | <strong>T</strong> Timer | <strong>P</strong> Pause</div>
     </div>
@@ -761,10 +791,14 @@ const assets = {
 };
 
 // --- 4. ENTITIES ---
+// Weapon cooldown constants
+const ROCKET_COOLDOWN = 4000; // 4 seconds
+const BASE_BLASTER_CD = 400; // Base cooldown (half of original 200)
+
 function initPlayers() {
     return [ 
-        { x: 180, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0 }, 
-        { x: 540, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0 } 
+        { x: 180, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false }, 
+        { x: 540, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false } 
     ];
 }
 const players = initPlayers();
@@ -772,6 +806,10 @@ const pBullets = [], eBullets = [], enemies = [], particles = [], capsules = [],
 const rockets = [];
 const shockwaves = []; // For nuke shockwave effects
 const shieldFragments = []; // For power shield shatter fragments
+const miniNukes = []; // For cluster nuke mini nukes
+
+// Nuke explosion radius (reduced from screen-wide)
+const NUKE_EXPLOSION_RADIUS = 150;
 
 const SWARM = { xOffset: 0, yBase: HEIGHT * 0.15, dir: 1, dropTimer: 0, slots: [], cols: 10, rows: 4, lastLowestRow: -1 };
 for(let i=0; i < SWARM.cols * SWARM.rows; i++) SWARM.slots.push(false);
@@ -1084,15 +1122,19 @@ let weaponLossMessage = { text: "", timer: 0 };
 function destroyRandomWeapon(p, pIdx) {
     // Build list of available weapons to destroy
     let weapons = [];
-    if (p.weaponLevel === 2) weapons.push({ name: "Blaster x 2", destroy: () => { p.weaponLevel = 1; } });
+    if (p.weaponLevel >= 2) weapons.push({ name: "Blaster Upgrade", destroy: () => { p.weaponLevel = 1; p.hasSpreadBlaster = false; } });
+    if (p.hasDoubleSpeed) weapons.push({ name: "Double Speed", destroy: () => { p.hasDoubleSpeed = false; } });
+    if (p.hasSpreadBlaster) weapons.push({ name: "Spread Blaster", destroy: () => { p.hasSpreadBlaster = false; } });
     if (p.hasRockets) weapons.push({ name: "Quad-Rockets", destroy: () => { p.hasRockets = false; } });
-    if (p.hasNuclearWeapon) weapons.push({ name: "Nuclear Bomb", destroy: () => { p.hasNuclearWeapon = false; p.nukes = 0; p.maxNukes = 1; } });
+    if (p.hasNuclearWeapon) weapons.push({ name: "Nuclear Bomb", destroy: () => { p.hasNuclearWeapon = false; p.nukes = 0; p.maxNukes = 1; p.hasClusterNukes = false; } });
+    if (p.hasClusterNukes) weapons.push({ name: "Cluster Nukes", destroy: () => { p.hasClusterNukes = false; } });
     if (p.hasPowerShield) weapons.push({ name: "Power Shield", destroy: () => { p.hasPowerShield = false; p.powerShieldHits = 0; } });
     
     if (weapons.length > 0) {
         let chosen = weapons[Math.floor(Math.random() * weapons.length)];
         chosen.destroy();
         weaponLossMessage = { text: (pIdx === 0 ? "P1" : "P2") + " LOST: " + chosen.name, timer: 2000 };
+        updateWeaponMenuButtons();
     }
 }
 
@@ -1154,7 +1196,7 @@ function updateNukeDisplay() {
             continue;
         }
         
-        // Show nuke icons based on maxNukes (1 initially, 3 after upgrade)
+        // Show nuke icons based on maxNukes (1 initially, 3 after upgrade, up to 13)
         let maxDisplay = players[i].maxNukes || 1;
         for(let j=0; j<maxDisplay; j++) {
             const icon = document.createElement('div');
@@ -1162,6 +1204,30 @@ function updateNukeDisplay() {
             icon.innerHTML = '☢';
             icon.style.color = '#ffff00';
             if(j < players[i].nukes) icon.classList.add('nuke-active');
+            container.appendChild(icon);
+        }
+    }
+}
+
+function updateRocketDisplay() {
+    for(let i=0; i<2; i++) {
+        const container = document.getElementById(i === 0 ? 'p1-rockets' : 'p2-rockets');
+        if (!container) continue;
+        container.innerHTML = '';
+        
+        // Only show rocket counter if player has rockets
+        if (!players[i].hasRockets) {
+            continue;
+        }
+        
+        // Calculate how many rockets are ready (0-4 based on cooldown)
+        let readyRockets = Math.floor(4 - (players[i].rocketCooldown / ROCKET_COOLDOWN) * 4);
+        readyRockets = Math.max(0, Math.min(4, readyRockets));
+        
+        for(let j=0; j<4; j++) {
+            const icon = document.createElement('div');
+            icon.className = 'rocket-icon';
+            if(j < readyRockets) icon.classList.add('rocket-ready');
             container.appendChild(icon);
         }
     }
@@ -1218,40 +1284,104 @@ window.selectWeapon = function(playerIndex, weaponId) {
     }
     
     let textLines = ["Your ship requires a calculation to", "install your new weapon system upgrade."];
-    if (weaponId === 3) { textLines = ["Nuclear launch codes required...", "Confirm authorization protocol."]; }
-    else if (weaponId === 2) { textLines = ["Your engineering crew can't figure out", "how to install your rockets.", "Help them with the math."]; }
-    else if (weaponId === 4) { textLines = ["Shield generator calibration required...", "Enter the frequency harmonics."]; }
+    
+    // Set custom text based on weapon ID
+    if (weaponId === 3 || weaponId === 31 || weaponId === 32) { 
+        textLines = ["Nuclear launch codes required...", "Confirm authorization protocol."]; 
+    }
+    else if (weaponId === 33) { 
+        textLines = ["Cluster munitions require precise", "targeting calculations."]; 
+    }
+    else if (weaponId === 2) { 
+        textLines = ["Your engineering crew can't figure out", "how to install your rockets.", "Help them with the math."]; 
+    }
+    else if (weaponId === 4) { 
+        textLines = ["Shield generator calibration required...", "Enter the frequency harmonics."]; 
+    }
+    else if (weaponId === 11) { 
+        textLines = ["Triple blaster alignment needed.", "Calculate the power distribution."]; 
+    }
+    else if (weaponId === 12) { 
+        textLines = ["Overclock the firing mechanism.", "Speed requires precision!"]; 
+    }
+    else if (weaponId === 13) { 
+        textLines = ["Spread pattern requires complex math.", "Wide arc calculations needed."]; 
+    }
+    else if (weaponId === 100) { 
+        // Reload Nukes - special 3-challenge mode
+        textLines = ["Woah, baby! How many Nukes can we jam", "in this bad boy? Just get the arming", "codes set."]; 
+    }
 
-    mathChallenge = { active: true, pIdx: playerIndex, wId: weaponId, num1: n1, num2: n2, operator: operator, correctAnswer: correctAnswer, answerStr: "", feedback: "", customText: textLines };
+    mathChallenge = { 
+        active: true, 
+        pIdx: playerIndex, 
+        wId: weaponId, 
+        num1: n1, 
+        num2: n2, 
+        operator: operator, 
+        correctAnswer: correctAnswer, 
+        answerStr: "", 
+        feedback: "", 
+        customText: textLines,
+        multiChallenge: weaponId === 100 ? 3 : 1, // 3 challenges for Reload Nukes
+        challengesCompleted: 0
+    };
     selectionPaused = true; canvas.focus();
 };
 
 function finalizeUpgrade(success) {
     let pIdx = mathChallenge.pIdx; let wId = mathChallenge.wId;
+    let p = players[pIdx];
+    
     if (success) {
         let weaponName = "Weapon " + wId;
-        if (wId === 1) { players[pIdx].weaponLevel = 2; weaponName = "Blaster x 2"; } 
-        else if (wId === 2) { players[pIdx].hasRockets = true; weaponName = "Quad-Rockets"; }
+        
+        // Blaster upgrades: 1=x2, 11=x3, 12=Double Speed, 13=Spread x5
+        if (wId === 1) { p.weaponLevel = 2; weaponName = "Blaster x 2"; } 
+        else if (wId === 11) { p.weaponLevel = 3; weaponName = "Blaster x 3"; }
+        else if (wId === 12) { p.hasDoubleSpeed = true; weaponName = "Double Speed Blaster"; }
+        else if (wId === 13) { p.hasSpreadBlaster = true; weaponName = "Spread Blaster x 5"; }
+        
+        // Rockets
+        else if (wId === 2) { p.hasRockets = true; weaponName = "Quad-Rockets"; }
+        
+        // Nuke upgrades: 3=Nuclear Bomb, 31=+2 Nukes, 32=+10 Nukes, 33=Cluster Nukes
         else if (wId === 3) { 
-            if (!players[pIdx].hasNuclearWeapon) {
-                // First unlock: nuke system with 1 nuke capacity, starts with 1 nuke
-                players[pIdx].hasNuclearWeapon = true; 
-                players[pIdx].maxNukes = 1;
-                players[pIdx].nukes = 1;
-                weaponName = "Nuclear Bomb System"; 
-            } else {
-                // Already unlocked: add +2 capacity
-                players[pIdx].maxNukes = 3;
-                players[pIdx].nukes = Math.min(players[pIdx].nukes + 2, 3);
-                weaponName = "+2 Nuke Capacity";
-            }
-            updateWeaponMenuButtons();
+            p.hasNuclearWeapon = true; 
+            p.maxNukes = 1;
+            p.nukes = 1;
+            weaponName = "Nuclear Bomb System"; 
         }
-        else if (wId === 4) { players[pIdx].hasPowerShield = true; players[pIdx].powerShieldHits = 0; weaponName = "Power Shield"; }
+        else if (wId === 31) {
+            p.maxNukes = 3;
+            p.nukes = Math.min(p.nukes + 2, 3);
+            weaponName = "+2 Nuke Capacity";
+        }
+        else if (wId === 32) {
+            p.maxNukes = Math.min(p.maxNukes + 10, 13);
+            p.nukes = Math.min(p.nukes + 10, p.maxNukes);
+            weaponName = "+10 Nuke Capacity";
+        }
+        else if (wId === 33) {
+            p.hasClusterNukes = true;
+            weaponName = "Cluster Nukes";
+        }
+        
+        // Power Shield
+        else if (wId === 4) { p.hasPowerShield = true; p.powerShieldHits = 0; weaponName = "Power Shield"; }
+        
+        // Reload Nukes (special - refills all nukes)
+        else if (wId === 100) {
+            p.nukes = p.maxNukes;
+            weaponName = "NUKES RELOADED!";
+            levelMessage = "MUUUUUUUUSTAAAAARRRRDDDD!";
+            levelMessageTimer = 3000;
+        }
 
         showToast((pIdx===0?"P1":"P2") + " Equipped " + weaponName);
         if(pIdx === 0) { p1Power = 0; p1Selecting = false; document.getElementById('p1-bar-container').classList.remove('static-active'); }
         else { p2Power = 0; p2Selecting = false; document.getElementById('p2-bar-container').classList.remove('static-active'); }
+        updateWeaponMenuButtons();
     } else {
         let penalty = Math.floor(Math.random() * 11) + 25; 
         if(pIdx === 0) { p1Power = Math.max(0, p1Power - penalty); p1Selecting = false; document.getElementById('p1-bar-container').classList.remove('static-active'); } 
@@ -1265,25 +1395,148 @@ function finalizeUpgrade(success) {
 }
 
 function updateWeaponMenuButtons() {
-    // Update P1 menu
-    const p1Menu = document.getElementById('p1-menu');
-    const p1NukeBtn = p1Menu.children[2]; // Nuclear Bomb button is 3rd
-    if (players[0].hasNuclearWeapon && players[0].maxNukes < 3) {
-        p1NukeBtn.textContent = '+2 Nukes';
-    } else if (players[0].maxNukes >= 3) {
-        p1NukeBtn.textContent = 'Nukes Maxed';
-        p1NukeBtn.disabled = true;
+    for (let pIdx = 0; pIdx < 2; pIdx++) {
+        const menu = document.getElementById(pIdx === 0 ? 'p1-menu' : 'p2-menu');
+        const p = players[pIdx];
+        menu.innerHTML = ''; // Clear existing buttons
+        
+        // Blaster upgrades
+        if (p.hasSpreadBlaster) {
+            // All blaster upgrades complete - no more blaster options
+        } else if (p.weaponLevel >= 3 && p.hasDoubleSpeed) {
+            // Both x3 and double speed unlocked - can get spread blaster
+            let btn = document.createElement('button');
+            btn.className = 'weapon-btn';
+            btn.textContent = 'Spread Blaster x5';
+            btn.onclick = () => selectWeapon(pIdx, 13);
+            menu.appendChild(btn);
+        } else if (p.weaponLevel >= 2) {
+            // x2 unlocked - can get x3 or double speed
+            if (p.weaponLevel < 3) {
+                let btn = document.createElement('button');
+                btn.className = 'weapon-btn';
+                btn.textContent = 'Blaster x 3';
+                btn.onclick = () => selectWeapon(pIdx, 11);
+                menu.appendChild(btn);
+            }
+            if (!p.hasDoubleSpeed) {
+                let btn = document.createElement('button');
+                btn.className = 'weapon-btn';
+                btn.textContent = 'Double Speed';
+                btn.onclick = () => selectWeapon(pIdx, 12);
+                menu.appendChild(btn);
+            }
+        } else {
+            let btn = document.createElement('button');
+            btn.className = 'weapon-btn';
+            btn.textContent = 'Blaster x 2';
+            btn.onclick = () => selectWeapon(pIdx, 1);
+            menu.appendChild(btn);
+        }
+        
+        // Rockets
+        if (!p.hasRockets) {
+            let btn = document.createElement('button');
+            btn.className = 'weapon-btn';
+            btn.textContent = 'Quad-Rockets';
+            btn.onclick = () => selectWeapon(pIdx, 2);
+            menu.appendChild(btn);
+        }
+        
+        // Nuke upgrades
+        if (!p.hasNuclearWeapon) {
+            let btn = document.createElement('button');
+            btn.className = 'weapon-btn';
+            btn.textContent = 'Nuclear Bomb';
+            btn.onclick = () => selectWeapon(pIdx, 3);
+            menu.appendChild(btn);
+        } else if (p.maxNukes === 1) {
+            let btn = document.createElement('button');
+            btn.className = 'weapon-btn';
+            btn.textContent = '+2 Nukes';
+            btn.onclick = () => selectWeapon(pIdx, 31);
+            menu.appendChild(btn);
+        } else if (p.maxNukes >= 3 && !p.hasClusterNukes) {
+            // After +2 nukes, show +10 nukes and cluster nukes
+            let btn1 = document.createElement('button');
+            btn1.className = 'weapon-btn';
+            btn1.textContent = '+10 Nukes';
+            btn1.onclick = () => selectWeapon(pIdx, 32);
+            menu.appendChild(btn1);
+            
+            let btn2 = document.createElement('button');
+            btn2.className = 'weapon-btn';
+            btn2.textContent = 'Cluster Nukes';
+            btn2.onclick = () => selectWeapon(pIdx, 33);
+            menu.appendChild(btn2);
+        } else if (p.maxNukes >= 3 && p.hasClusterNukes && p.maxNukes < 13) {
+            // Has cluster nukes but not max capacity yet
+            let btn = document.createElement('button');
+            btn.className = 'weapon-btn';
+            btn.textContent = '+10 Nukes';
+            btn.onclick = () => selectWeapon(pIdx, 32);
+            menu.appendChild(btn);
+        }
+        
+        // Power Shield
+        if (!p.hasPowerShield) {
+            let btn = document.createElement('button');
+            btn.className = 'weapon-btn';
+            btn.textContent = 'Power Shield';
+            btn.onclick = () => selectWeapon(pIdx, 4);
+            menu.appendChild(btn);
+        }
+        
+        // Check if all other upgrades are unlocked for Reload Nukes
+        let allUpgraded = p.hasSpreadBlaster && p.hasRockets && p.hasNuclearWeapon && 
+                          p.hasClusterNukes && p.hasPowerShield && p.maxNukes >= 13;
+        if (allUpgraded && p.nukes < p.maxNukes) {
+            let btn = document.createElement('button');
+            btn.className = 'weapon-btn';
+            btn.style.backgroundColor = '#550055';
+            btn.style.borderColor = '#ff00ff';
+            btn.textContent = 'Reload Nukes';
+            btn.onclick = () => selectWeapon(pIdx, 100);
+            menu.appendChild(btn);
+        }
+    }
+}
+
+function fireBlaster(p, owner) {
+    let cooldown = p.hasDoubleSpeed ? BASE_BLASTER_CD / 2 : BASE_BLASTER_CD;
+    
+    if (p.hasSpreadBlaster) {
+        // Spread Blaster x5: 5 shots over 60 degree arc
+        let arcSpan = (60 * Math.PI) / 180; // 60 degrees in radians
+        let centerAngle = -Math.PI / 2; // Straight up
+        for (let i = 0; i < 5; i++) {
+            let angle = centerAngle - arcSpan/2 + (i / 4) * arcSpan;
+            pBullets.push({
+                x: p.x + p.w/2 - 4, 
+                y: p.y, 
+                w: 8, 
+                h: 16, 
+                owner: owner,
+                vx: Math.cos(angle) * 0.6,
+                vy: Math.sin(angle) * 0.6
+            });
+        }
+    } else if (p.weaponLevel >= 3) {
+        // Blaster x3
+        pBullets.push({x: p.x+8, y: p.y, w:8, h:16, owner: owner});
+        pBullets.push({x: p.x+28, y: p.y, w:8, h:16, owner: owner});
+        pBullets.push({x: p.x+48, y: p.y, w:8, h:16, owner: owner});
+    } else if (p.weaponLevel === 2) {
+        // Blaster x2
+        pBullets.push({x: p.x+16, y: p.y, w:8, h:16, owner: owner});
+        pBullets.push({x: p.x+40, y: p.y, w:8, h:16, owner: owner});
+    } else {
+        // Single blaster
+        pBullets.push({x: p.x+24, y: p.y, w:8, h:16, owner: owner});
     }
     
-    // Update P2 menu
-    const p2Menu = document.getElementById('p2-menu');
-    const p2NukeBtn = p2Menu.children[2]; // Nuclear Bomb button is 3rd
-    if (players[1].hasNuclearWeapon && players[1].maxNukes < 3) {
-        p2NukeBtn.textContent = '+2 Nukes';
-    } else if (players[1].maxNukes >= 3) {
-        p2NukeBtn.textContent = 'Nukes Maxed';
-        p2NukeBtn.disabled = true;
-    }
+    sfx.shoot(800);
+    p.cd = cooldown;
 }
 
 function launchRockets(p) {
@@ -1319,51 +1572,101 @@ function launchNuke(pIdx) {
         vy: -(nukeSpeed / 100), // Start moving forward slowly
         phase: 'homing',
         target: initialTarget,
-        rotation: 0
+        rotation: 0,
+        isCluster: players[pIdx].hasClusterNukes
     });
 }
 
-function detonateNuke(x, y) {
+function detonateNuke(x, y, isCluster = false, isMini = false) {
     sfx.explosion('nuke');
     
-    // Create massive explosion particles
-    for(let i=0; i<50; i++) {
+    let radius = isMini ? NUKE_EXPLOSION_RADIUS / 2 : NUKE_EXPLOSION_RADIUS;
+    let particleCount = isMini ? 20 : 50;
+    let particleScale = isMini ? 0.5 : 1;
+    
+    // Create explosion particles
+    for(let i=0; i<particleCount; i++) {
         particles.push({ 
             x: x, y: y, 
-            vx: (Math.random()-0.5)*12, 
-            vy: (Math.random()-0.5)*12, 
+            vx: (Math.random()-0.5)*12*particleScale, 
+            vy: (Math.random()-0.5)*12*particleScale, 
             life: 1.5, 
             color: ['#ff0000', '#ff5500', '#ffaa00', '#ffff00'][Math.floor(Math.random()*4)], 
-            size: 8+Math.random()*8 
+            size: (8+Math.random()*8)*particleScale 
         });
     }
     
     // Create expanding shockwaves
-    shockwaves.push({ x: x, y: y, radius: 0, maxRadius: 300, life: 1.0, speed: 400 });
-    shockwaves.push({ x: x, y: y, radius: 0, maxRadius: 250, life: 1.0, speed: 350, delay: 100 });
-    shockwaves.push({ x: x, y: y, radius: 0, maxRadius: 200, life: 1.0, speed: 300, delay: 200 });
-    
-    // Destroy all enemies
-    for (let i = 0; i < enemies.length; i++) {
-        createExplosion(enemies[i].x + enemies[i].w/2, enemies[i].y + enemies[i].h/2, '#ffaa00', 2.0);
-        if(enemies[i].type === 'shooter' && enemies[i].slotIndex !== -1) SWARM.slots[enemies[i].slotIndex] = false;
+    if (!isMini) {
+        shockwaves.push({ x: x, y: y, radius: 0, maxRadius: radius * 2, life: 1.0, speed: 400 });
+        shockwaves.push({ x: x, y: y, radius: 0, maxRadius: radius * 1.5, life: 1.0, speed: 350, delay: 100 });
+    } else {
+        shockwaves.push({ x: x, y: y, radius: 0, maxRadius: radius, life: 0.5, speed: 300 });
     }
-    enemies.length = 0; 
     
-    // White flash effect
-    let flash = document.createElement('div');
-    flash.style.position = 'fixed'; flash.style.top = 0; flash.style.left = 0; 
-    flash.style.width = '100%'; flash.style.height = '100%'; 
-    flash.style.backgroundColor = 'white'; flash.style.zIndex = 9999;
-    document.body.appendChild(flash);
-    setTimeout(() => { 
-        flash.style.transition = 'opacity 1s'; 
-        flash.style.opacity = 0; 
-        setTimeout(() => flash.remove(), 1000); 
-    }, 50);
+    // Destroy enemies within radius
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        let dist = Math.hypot((e.x + e.w/2) - x, (e.y + e.h/2) - y);
+        if (dist < radius) {
+            createExplosion(e.x + e.w/2, e.y + e.h/2, '#ffaa00', 2.0);
+            if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false;
+            enemies.splice(i, 1);
+        }
+    }
+    
+    // White flash effect (only for main nukes)
+    if (!isMini) {
+        let flash = document.createElement('div');
+        flash.style.position = 'fixed'; flash.style.top = 0; flash.style.left = 0; 
+        flash.style.width = '100%'; flash.style.height = '100%'; 
+        flash.style.backgroundColor = 'white'; flash.style.zIndex = 9999;
+        flash.style.opacity = isMini ? '0.3' : '0.7';
+        document.body.appendChild(flash);
+        setTimeout(() => { 
+            flash.style.transition = 'opacity 0.5s'; 
+            flash.style.opacity = 0; 
+            setTimeout(() => flash.remove(), 500); 
+        }, 50);
+    }
+    
+    // If this is a cluster nuke, spawn mini nukes
+    if (isCluster && !isMini) {
+        for (let i = 0; i < 5; i++) {
+            let angle = (i / 5) * Math.PI * 2;
+            let target = null;
+            if (enemies.length > 0) {
+                target = enemies[Math.floor(Math.random() * enemies.length)];
+            }
+            miniNukes.push({
+                x: x,
+                y: y,
+                w: 8,
+                h: 8,
+                vx: Math.cos(angle) * 0.15,
+                vy: Math.sin(angle) * 0.15,
+                phase: 'spreading',
+                spreadTimer: 300,
+                target: target,
+                rotation: 0
+            });
+        }
+    }
 }
 
-function updateBullets(arr, spd, dt) { for(let i=arr.length-1; i>=0; i--) { arr[i].y += spd * dt; if(arr[i].y < -20 || arr[i].y > HEIGHT+20) arr.splice(i, 1); } }
+function updateBullets(arr, spd, dt) { 
+    for(let i=arr.length-1; i>=0; i--) { 
+        let b = arr[i];
+        // If bullet has custom velocity, use it
+        if (b.vx !== undefined || b.vy !== undefined) {
+            b.x += (b.vx || 0) * dt;
+            b.y += (b.vy || 0) * dt;
+        } else {
+            b.y += spd * dt; 
+        }
+        if(b.y < -20 || b.y > HEIGHT+20 || b.x < -20 || b.x > WIDTH+20) arr.splice(i, 1); 
+    } 
+}
 function rectIntersect(r1, r2) { return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y); }
 function drawArrow(x, y, dir) { ctx.lineWidth = 4; ctx.strokeStyle = '#0f0'; ctx.beginPath(); if (dir === 'left') { ctx.moveTo(x + 30, y - 12); ctx.lineTo(x, y - 12); ctx.lineTo(x, y - 25); ctx.lineTo(x - 25, y); ctx.lineTo(x, y + 25); ctx.lineTo(x, y + 12); ctx.lineTo(x + 30, y + 12); ctx.lineTo(x + 30, y - 12); } else { ctx.moveTo(x - 30, y - 12); ctx.lineTo(x, y - 12); ctx.lineTo(x, y - 25); ctx.lineTo(x + 25, y); ctx.lineTo(x, y + 25); ctx.lineTo(x, y + 12); ctx.lineTo(x - 30, y + 12); ctx.lineTo(x - 30, y - 12); } ctx.stroke(); }
 
@@ -1373,6 +1676,14 @@ function drawMathChallenge() {
     let bx = WIDTH/2 - 250, by = HEIGHT/2 - 150; ctx.fillRect(bx, by, 500, 400); ctx.strokeRect(bx, by, 500, 400);
     ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "18px Courier New";
     let ty = by + 50; mathChallenge.customText.forEach(line => { ctx.fillText(line, WIDTH/2, ty); ty += 25; });
+    
+    // Show challenge progress for multi-challenge
+    if (mathChallenge.multiChallenge > 1) {
+        ctx.font = "16px Courier New";
+        ctx.fillStyle = "#ff00ff";
+        ctx.fillText(`Challenge ${mathChallenge.challengesCompleted + 1} of ${mathChallenge.multiChallenge}`, WIDTH/2, by + 120);
+    }
+    
     ctx.font = "40px Courier New"; ctx.fillStyle = "#ffff00"; ctx.fillText(`${mathChallenge.num1} ${mathChallenge.operator || 'x'} ${mathChallenge.num2} = ?`, WIDTH/2, by + 160);
     ctx.font = "32px Courier New"; ctx.fillStyle = "#00ff00"; ctx.fillText(mathChallenge.answerStr + "_", WIDTH/2, by + 220);
     if (mathChallenge.feedback) { ctx.fillStyle = (mathChallenge.feedback.includes("Uh oh") || mathChallenge.feedback.includes("Failed")) ? "#ff0000" : "#00ff00"; const lines = mathChallenge.feedback.split('\n'); let fby = by + 270; lines.forEach(line => { ctx.fillText(line, WIDTH/2, fby); fby += 30; }); }
@@ -1381,7 +1692,7 @@ function drawMathChallenge() {
 
 function update(dt) {
     document.getElementById('p1-fill').style.height = p1Power + '%'; document.getElementById('p2-fill').style.height = p2Power + '%';
-    checkPowerLevels(); updateNukeDisplay();
+    checkPowerLevels(); updateNukeDisplay(); updateRocketDisplay();
     if(showStars) updateStars(dt);
     
     // Check for gamepad start
@@ -1440,10 +1751,9 @@ function update(dt) {
                 if(keys['ArrowLeft']) p.x -= 0.4 * dt; 
                 if(keys['ArrowRight']) p.x += 0.4 * dt;
                 if((keys['ControlLeft']||keys['ShiftLeft']) && p.cd <= 0) { 
-                    if (p.weaponLevel === 2) { pBullets.push({x: p.x+16, y: p.y, w:8, h:16, owner: 0}); pBullets.push({x: p.x+40, y: p.y, w:8, h:16, owner: 0}); } else { pBullets.push({x: p.x+24, y: p.y, w:8, h:16, owner: 0}); }
-                    sfx.shoot(800); p.cd = 200; 
+                    fireBlaster(p, 0);
                 }
-                if(keys['KeyZ'] && p.hasRockets && p.rocketCooldown <= 0) { launchRockets(p); p.rocketCooldown = 15000; showToast("P1 Rockets Launched!"); }
+                if(keys['KeyZ'] && p.hasRockets && p.rocketCooldown <= 0) { launchRockets(p); p.rocketCooldown = ROCKET_COOLDOWN; showToast("P1 Rockets Launched!"); }
                 if(keys['KeyX'] && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(0); } 
             } else if (p1ControlType === 'gamepad' && gamepadIndex !== null) {
                 // P1 Gamepad controls
@@ -1451,10 +1761,9 @@ function update(dt) {
                 if(gp) { 
                     if(Math.abs(gp.axes[0])>0.1) p.x += gp.axes[0]*0.4*dt; 
                     if(gp.buttons[0].pressed && p.cd <= 0) { 
-                        if (p.weaponLevel === 2) { pBullets.push({x: p.x+16, y: p.y, w:8, h:16, owner: 0}); pBullets.push({x: p.x+40, y: p.y, w:8, h:16, owner: 0}); } else { pBullets.push({x: p.x+24, y: p.y, w:8, h:16, owner: 0}); }
-                        sfx.shoot(800); p.cd = 200; 
+                        fireBlaster(p, 0);
                     }
-                    if(gp.buttons[1].pressed && p.hasRockets && p.rocketCooldown <= 0) { launchRockets(p); p.rocketCooldown = 15000; showToast("P1 Rockets Launched!"); }
+                    if(gp.buttons[1].pressed && p.hasRockets && p.rocketCooldown <= 0) { launchRockets(p); p.rocketCooldown = ROCKET_COOLDOWN; showToast("P1 Rockets Launched!"); }
                     if(gp.buttons[2].pressed && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(0); }
                 }
             }
@@ -1466,10 +1775,9 @@ function update(dt) {
                 if(keys['KeyA']) p.x -= 0.4 * dt; 
                 if(keys['KeyD']) p.x += 0.4 * dt;
                 if(keys['KeyW'] && p.cd <= 0) { 
-                    if (p.weaponLevel === 2) { pBullets.push({x: p.x+16, y: p.y, w:8, h:16, owner: 1}); pBullets.push({x: p.x+40, y: p.y, w:8, h:16, owner: 1}); } else { pBullets.push({x: p.x+24, y: p.y, w:8, h:16, owner: 1}); }
-                    sfx.shoot(800); p.cd = 200; 
+                    fireBlaster(p, 1);
                 }
-                if(keys['KeyQ'] && p.hasRockets && p.rocketCooldown <= 0) { launchRockets(p); p.rocketCooldown = 15000; showToast("P2 Rockets Launched!"); }
+                if(keys['KeyQ'] && p.hasRockets && p.rocketCooldown <= 0) { launchRockets(p); p.rocketCooldown = ROCKET_COOLDOWN; showToast("P2 Rockets Launched!"); }
                 if(keys['KeyE'] && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(1); }
             } else if (p2ControlType === 'gamepad') {
                 // P2 Gamepad controls - use second gamepad if available, otherwise share first
@@ -1479,10 +1787,9 @@ function update(dt) {
                     if(gp) { 
                         if(Math.abs(gp.axes[0])>0.1) p.x += gp.axes[0]*0.4*dt; 
                         if(gp.buttons[0].pressed && p.cd <= 0) { 
-                            if (p.weaponLevel === 2) { pBullets.push({x: p.x+16, y: p.y, w:8, h:16, owner: 1}); pBullets.push({x: p.x+40, y: p.y, w:8, h:16, owner: 1}); } else { pBullets.push({x: p.x+24, y: p.y, w:8, h:16, owner: 1}); }
-                            sfx.shoot(800); p.cd = 200; 
+                            fireBlaster(p, 1);
                         }
-                        if(gp.buttons[1].pressed && p.hasRockets && p.rocketCooldown <= 0) { launchRockets(p); p.rocketCooldown = 15000; showToast("P2 Rockets Launched!"); }
+                        if(gp.buttons[1].pressed && p.hasRockets && p.rocketCooldown <= 0) { launchRockets(p); p.rocketCooldown = ROCKET_COOLDOWN; showToast("P2 Rockets Launched!"); }
                         if(gp.buttons[2].pressed && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(1); }
                     }
                 }
@@ -1616,8 +1923,69 @@ function update(dt) {
         }
         
         if (hit || n.y < -50 || n.y > HEIGHT || n.x < -50 || n.x > WIDTH + 50) { 
-            detonateNuke(n.x + n.w/2, n.y + n.h/2); 
+            detonateNuke(n.x + n.w/2, n.y + n.h/2, n.isCluster, false); 
             activeNukes.splice(i, 1); 
+        }
+    }
+    
+    // Update mini nukes (from cluster nukes)
+    for(let i=miniNukes.length-1; i>=0; i--) {
+        let mn = miniNukes[i];
+        
+        if (mn.phase === 'spreading') {
+            mn.x += mn.vx * dt;
+            mn.y += mn.vy * dt;
+            mn.spreadTimer -= dt;
+            if (mn.spreadTimer <= 0) {
+                mn.phase = 'homing';
+            }
+        } else if (mn.phase === 'homing') {
+            // Find closest target
+            if (!mn.target || !enemies.includes(mn.target)) {
+                if (enemies.length > 0) {
+                    let closest = null;
+                    let minDist = 999999;
+                    enemies.forEach(e => {
+                        let dist = Math.hypot(e.x - mn.x, e.y - mn.y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            closest = e;
+                        }
+                    });
+                    mn.target = closest;
+                }
+            }
+            
+            if (mn.target && enemies.includes(mn.target)) {
+                let dx = (mn.target.x + mn.target.w/2) - mn.x;
+                let dy = (mn.target.y + mn.target.h/2) - mn.y;
+                let angle = Math.atan2(dy, dx);
+                let speed = (nukeSpeed / 100) * 1.5;
+                mn.vx = Math.cos(angle) * speed;
+                mn.vy = Math.sin(angle) * speed;
+            } else {
+                mn.vy = -(nukeSpeed / 100);
+            }
+            
+            mn.x += mn.vx * dt;
+            mn.y += mn.vy * dt;
+            mn.rotation = Math.atan2(mn.vy, mn.vx) + Math.PI / 2;
+        }
+        
+        // Check collision with enemies
+        let hit = false;
+        for(let eIdx=enemies.length-1; eIdx>=0; eIdx--) {
+            let e = enemies[eIdx];
+            let mnRect = { x: mn.x - mn.w/2, y: mn.y - mn.h/2, w: mn.w, h: mn.h };
+            if(rectIntersect(mnRect, e)) {
+                hit = true;
+                break;
+            }
+        }
+        
+        if (hit || mn.y < -50 || mn.y > HEIGHT || mn.x < -50 || mn.x > WIDTH + 50) {
+            detonateNuke(mn.x, mn.y, false, true);
+            miniNukes.splice(i, 1);
         }
     }
     
@@ -1807,6 +2175,15 @@ function draw() {
         ctx.restore();
     });
     
+    // Draw mini nukes (from cluster nukes)
+    miniNukes.forEach(mn => {
+        ctx.save();
+        ctx.translate(mn.x, mn.y);
+        ctx.rotate(mn.rotation);
+        ctx.drawImage(assets.nuke_pickup, -4, -4, 8, 8); // 25% of normal size (32 -> 8)
+        ctx.restore();
+    });
+    
     // Draw shockwaves
     shockwaves.forEach(sw => {
         if(!sw.delay || sw.delay <= 0) {
@@ -1873,7 +2250,57 @@ function draw() {
 window.addEventListener('keydown', e => { 
     keys[e.code] = true; 
     if (mathChallenge.active) {
-        if (e.key >= '0' && e.key <= '9') { mathChallenge.answerStr += e.key; } else if (e.key === 'Backspace') { mathChallenge.answerStr = mathChallenge.answerStr.slice(0, -1); } else if (e.key === '`' || e.code === 'Backquote') { mathChallenge.answerStr = mathChallenge.correctAnswer.toString(); } else if (e.key === 'Enter') { let val = parseInt(mathChallenge.answerStr); if (val === mathChallenge.correctAnswer) { mathChallenge.feedback = "Freakin' Sweet!\nThat's Correct!"; setTimeout(() => finalizeUpgrade(true), 500); } else { mathChallenge.feedback = "Uh oh! That wasn't right."; setTimeout(() => finalizeUpgrade(false), 800); } } return; 
+        if (e.key >= '0' && e.key <= '9') { mathChallenge.answerStr += e.key; } 
+        else if (e.key === 'Backspace') { mathChallenge.answerStr = mathChallenge.answerStr.slice(0, -1); } 
+        else if (e.key === '`' || e.code === 'Backquote') { mathChallenge.answerStr = mathChallenge.correctAnswer.toString(); } 
+        else if (e.key === 'Enter') { 
+            let val = parseInt(mathChallenge.answerStr); 
+            if (val === mathChallenge.correctAnswer) { 
+                // Check if this is a multi-challenge (Reload Nukes)
+                if (mathChallenge.multiChallenge > 1) {
+                    mathChallenge.challengesCompleted++;
+                    if (mathChallenge.challengesCompleted < mathChallenge.multiChallenge) {
+                        // More challenges needed
+                        mathChallenge.feedback = `Correct! (${mathChallenge.challengesCompleted}/${mathChallenge.multiChallenge})`;
+                        mathChallenge.answerStr = "";
+                        // Generate new problem
+                        let challengeType = Math.floor(Math.random() * 3);
+                        if (challengeType === 0) {
+                            mathChallenge.num1 = Math.floor(Math.random() * 12) + 1;
+                            mathChallenge.num2 = Math.floor(Math.random() * 12) + 1;
+                            mathChallenge.correctAnswer = mathChallenge.num1 * mathChallenge.num2;
+                            mathChallenge.operator = 'x';
+                        } else if (challengeType === 1) {
+                            mathChallenge.num1 = Math.floor(Math.random() * 90) + 10;
+                            mathChallenge.num2 = Math.floor(Math.random() * 99) + 1;
+                            mathChallenge.correctAnswer = mathChallenge.num1 + mathChallenge.num2;
+                            mathChallenge.operator = '+';
+                        } else {
+                            mathChallenge.num1 = Math.floor(Math.random() * 90) + 10;
+                            mathChallenge.num2 = Math.floor(Math.random() * 99) + 1;
+                            if (mathChallenge.num2 > mathChallenge.num1) { 
+                                let temp = mathChallenge.num1; 
+                                mathChallenge.num1 = mathChallenge.num2; 
+                                mathChallenge.num2 = temp; 
+                            }
+                            mathChallenge.correctAnswer = mathChallenge.num1 - mathChallenge.num2;
+                            mathChallenge.operator = '-';
+                        }
+                    } else {
+                        // All challenges completed!
+                        mathChallenge.feedback = "PERFECT!\nAll codes accepted!";
+                        setTimeout(() => finalizeUpgrade(true), 500);
+                    }
+                } else {
+                    mathChallenge.feedback = "Freakin' Sweet!\nThat's Correct!"; 
+                    setTimeout(() => finalizeUpgrade(true), 500); 
+                }
+            } else { 
+                mathChallenge.feedback = "Uh oh! That wasn't right."; 
+                setTimeout(() => finalizeUpgrade(false), 800); 
+            } 
+        } 
+        return; 
     }
     if(e.key === 'o' || e.code === 'KeyO') { p1Power = 100; } 
     // Changed W key behavior - only fill P2 power if P2 is using keyboard for shooting (not using W for movement)
