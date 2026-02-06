@@ -4,10 +4,10 @@
 [NukeSpeed] <15%>
 
 [Level 0] <LevelStart 0:00>
-[ShipsPerMin 120]
+[ShipsPerMin 65]
 
 [Chargers]
-<speed 150%>
+<speed 125%>
 <commonness 15%>
 <PowerDropChance 100%>
 <NukeDropChance 0%>
@@ -32,21 +32,19 @@
 
 [Level 1] <LevelStart 0:00>
 
-[ShipsPerMin 150]
+[ShipsPerMin 65]
 
 [EnergyCapsuleSpeed 5%]
 
 
-
-
 [Event]{
 [0:15]
-[Buggers] <Count 3>
+[Buggers] <Count 2>
 }
 
 [Event]{
-[0:21]
-[Buggers] <Count 3>
+[0:35]
+[Buggers] <Count 2>
 }
 
 
