@@ -1293,23 +1293,15 @@ function updateRocketDisplay() {
         }
         
         let p = players[i];
-        let cooldown = p.hasDoubleMissileSpeed ? ROCKET_COOLDOWN / 2 : ROCKET_COOLDOWN;
         
-        // Show missiles in storage (groups of 4)
+        // Show missile icons - only currentMissiles shown as ready (available to fire)
         let totalIcons = p.maxMissiles;
         for(let j=0; j<totalIcons; j++) {
             const icon = document.createElement('div');
             icon.className = 'rocket-icon';
             
-            // Calculate how many are ready (current + charging)
             if (j < p.currentMissiles) {
                 icon.classList.add('rocket-ready');
-            } else if (p.rocketCooldown > 0 && j < p.currentMissiles + 4) {
-                // Show partial charging for next set
-                let chargeProgress = 1 - (p.rocketCooldown / cooldown);
-                if (j < p.currentMissiles + Math.floor(4 * chargeProgress)) {
-                    icon.classList.add('rocket-ready');
-                }
             }
             
             container.appendChild(icon);
@@ -1684,11 +1676,6 @@ function launchRockets(p, count) {
         rockets.push({ x: cx, y: cy, w: 16, h: 32, vx: vx, vy: 0, phase: 'deploy', timer: 0 }); 
     }
     sfx.rocketLaunch();
-    
-    // Start the Ocho counter if applicable
-    if (p.hasOchoMissiles) {
-        p.ochoMissileChargeTimer = 4000; // 4 seconds to count from 0 to 8
-    }
 }
 
 function launchNuke(pIdx) {
@@ -1913,16 +1900,12 @@ function update(dt) {
         if(p.rocketCooldown > 0) {
             p.rocketCooldown -= dt;
             if (p.rocketCooldown <= 0) {
-                // Cooldown finished, restore missiles
-                let restoreAmount = p.hasOchoMissiles ? 8 : 4;
-                p.currentMissiles = Math.min(p.currentMissiles + restoreAmount, p.maxMissiles);
+                // Cooldown finished, restore all missiles to max
+                p.currentMissiles = p.maxMissiles;
+                p.rocketCooldown = 0;
             }
         }
         
-        // Update Ocho missile charge timer
-        if (p.ochoMissileChargeTimer > 0) {
-            p.ochoMissileChargeTimer -= dt;
-        } 
         if (p.state === 'respawning') { p.respawnTimer -= dt; if(p.respawnTimer <= 0) { p.state = 'entering'; p.x = (i===0) ? 180 : 540; p.y = HEIGHT + 64; } return; }
         if (p.state === 'entering') { p.y -= 0.3 * dt; if (p.y <= p.startY) { p.y = p.startY; p.state = 'active'; p.shieldTimer = 3000; } return; }
         if (p.shieldTimer > 0) p.shieldTimer -= dt;
@@ -2485,11 +2468,13 @@ function draw() {
     // Draw weapon loss message
     if(weaponLossMessage.timer > 0) { ctx.save(); ctx.fillStyle = "#ff4444"; ctx.font = "bold 36px Courier New"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.shadowColor = "#000"; ctx.shadowBlur = 10; ctx.fillText(weaponLossMessage.text, WIDTH/2, HEIGHT/2 + 50); ctx.restore(); }
     
-    // Draw Ocho missile counter (counts up by 2 over 4 seconds)
+    // Draw Ocho missile counter (counts up by 2 during reload, synced to actual cooldown)
     players.forEach((p, i) => {
-        if (p.ochoMissileChargeTimer > 0) {
-            let elapsed = 4000 - p.ochoMissileChargeTimer;
-            let currentCount = Math.min(8, Math.floor((elapsed / 4000) * 4) * 2); // Count by 2s: 0, 2, 4, 6, 8
+        if (p.hasOchoMissiles && p.rocketCooldown > 0) {
+            let cooldown = p.hasDoubleMissileSpeed ? ROCKET_COOLDOWN / 2 : ROCKET_COOLDOWN;
+            let elapsed = cooldown - p.rocketCooldown;
+            let steps = p.maxMissiles / 2; // Count by 2s: 0, 2, 4, 6, 8
+            let currentCount = Math.min(p.maxMissiles, Math.floor((elapsed / cooldown) * steps) * 2);
             ctx.save();
             ctx.fillStyle = "#ff6600";
             ctx.font = "bold 48px Courier New";
