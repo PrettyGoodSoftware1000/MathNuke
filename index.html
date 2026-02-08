@@ -701,6 +701,7 @@ const BASE_CAPSULE_SPEED = 2.0;
 let defaultLives = 25; // Default lives, can be overridden by config.txt
 let powerUpValve = 100; // How much % each energy capsule fills the bar (menu triggers at 100%), can be overridden by config.txt
 let nukeSpeed = 7.5; // Movement speed of nukes as percentage, can be overridden by config.txt
+let deathShipsPerMinTimer = 0; // When > 0, ShipsPerMin is forced to 0 (death effect, lasts 10s)
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const keys = {};
@@ -1250,6 +1251,9 @@ function handlePlayerHit(p, pIdx) {
     
     // Destroy a random weapon when losing a life
     destroyRandomWeapon(p, pIdx);
+    
+    // Death effect: force ShipsPerMin to 0 for 10 seconds (takes precedence over all other modifiers)
+    deathShipsPerMinTimer = 10000;
     
     if (p.lives <= 0) { p.dead = true; } else { p.state = 'respawning'; p.respawnTimer = 3000; }
 }
@@ -1866,10 +1870,16 @@ function update(dt) {
 
     if (!levelTransitionPending) {
         gameTime += dt; spawnTimer += dt; 
+        // Decrement death effect timer
+        if (deathShipsPerMinTimer > 0) deathShipsPerMinTimer -= dt;
         // Apply ShipsPerMin boost based on upgrades and enemy count
         let effectiveShipsPerMin = enemyConfig.shipsPerMin + getShipsPerMinBoost();
+        // Death effect: override ShipsPerMin to 0 for 10s after a player dies (takes precedence)
+        if (deathShipsPerMinTimer > 0) effectiveShipsPerMin = 0;
+        if (effectiveShipsPerMin > 0) {
         const interval = 60000 / effectiveShipsPerMin;
         if (spawnTimer > interval) { createEnemy(); spawnTimer = 0; }
+        }
         while (eventTimeline.length > 0 && nextEventIndex < eventTimeline.length) {
             const ev = eventTimeline[nextEventIndex];
             if (gameTime >= ev.time) { for(let k=0; k<ev.count; k++) createEnemy(ev.type); showToast(`EVENT: ${ev.count} ${ev.type.toUpperCase()}S!`); nextEventIndex++; } else { break; }
