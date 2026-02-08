@@ -658,6 +658,7 @@ let lastTime = 0;
 let gameStarted = false;
 let gamePaused = false; 
 let selectionPaused = false; 
+let postChallengePaused = false; // Pause after math challenge until player moves or fires
 let gameOver = false;
 let animFrame = 0;
 let showStars = false;
@@ -800,8 +801,8 @@ const BASE_BLASTER_CD = 400; // Base cooldown (half of original 200)
 
 function initPlayers() {
     return [ 
-        { x: 180, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false }, 
-        { x: 540, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false } 
+        { x: 180, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false }, 
+        { x: 540, y: 470, startY: 470, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, rocketCooldown: 0, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false } 
     ];
 }
 const players = initPlayers();
@@ -845,6 +846,11 @@ function parseConfigText(text) {
     let currentEventTime = -1;
     
     const cloneConfig = (cfg) => JSON.parse(JSON.stringify(cfg));
+    // Shooter commonness is always calculated: 100% minus sum of all other ship types
+    const calcShooterWeight = (cfg) => {
+        let otherTotal = cfg.chargers.weight + cfg.fatties.weight + cfg.buggers.weight;
+        cfg.shooters.weight = Math.max(0, 100 - otherTotal);
+    };
     const lines = text.split('\n');
     let currentSection = null;
     let inEventBlock = false;
@@ -887,6 +893,7 @@ function parseConfigText(text) {
         const levelMatch = l.match(levelHeaderRegex);
         if (levelMatch) {
             if (currentLevelStartTime !== -1) { 
+                calcShooterWeight(workingConfig);
                 levelTimeline.push({ time: currentLevelStartTime, name: currentLevelLabel, config: cloneConfig(workingConfig) }); 
             }
             currentLevelStartTime = (parseInt(levelMatch[2]) * 60 + parseInt(levelMatch[3])) * 1000;
@@ -925,7 +932,7 @@ function parseConfigText(text) {
             const nukeMatch = l.match(nukeRegex);
             
             if (speedMatch) workingConfig[currentSection].speed = parseFloat(speedMatch[1]) / 100;
-            if (commMatch) workingConfig[currentSection].weight = parseFloat(commMatch[1]);
+            if (commMatch && currentSection !== 'shooters') workingConfig[currentSection].weight = parseFloat(commMatch[1]);
             if (dropMatch) workingConfig[currentSection].dropChance = parseFloat(dropMatch[1]) / 100;
             if (nukeMatch) workingConfig[currentSection].nukeChance = parseFloat(nukeMatch[1]) / 100;
 
@@ -936,7 +943,7 @@ function parseConfigText(text) {
         }
     });
 
-    if (currentLevelStartTime !== -1) { levelTimeline.push({ time: currentLevelStartTime, name: currentLevelLabel, config: cloneConfig(workingConfig) }); }
+    if (currentLevelStartTime !== -1) { calcShooterWeight(workingConfig); levelTimeline.push({ time: currentLevelStartTime, name: currentLevelLabel, config: cloneConfig(workingConfig) }); }
     levelTimeline.sort((a,b) => a.time - b.time);
     eventTimeline.sort((a,b) => a.time - b.time);
     console.log('Config parsed - PowerUpValve:', powerUpValve, 'NukeSpeed:', nukeSpeed);
@@ -1484,7 +1491,11 @@ function finalizeUpgrade(success) {
     mathChallenge.active = false;
     if (pIdx === 0 && p2Selecting) { document.getElementById('p2-menu').style.display = 'flex'; } else if (pIdx === 1 && p1Selecting) { document.getElementById('p1-menu').style.display = 'flex'; }
     checkPowerLevels(); 
-    if (!selectionPaused && !gamePaused && audioCtx.state === 'suspended') audioCtx.resume();
+    // Auto-pause after math challenge until player moves or fires
+    if (!selectionPaused) {
+        postChallengePaused = true;
+    }
+    if (!selectionPaused && !postChallengePaused && !gamePaused && audioCtx.state === 'suspended') audioCtx.resume();
 }
 
 function updateWeaponMenuButtons() {
@@ -1853,6 +1864,19 @@ function update(dt) {
     if(!gameStarted || gameOver) return;
     if(gamePaused || selectionPaused) return; 
     
+    // Post-challenge pause: check for gamepad input to unpause
+    if (postChallengePaused) {
+        [gamepadIndex, gamepadIndex2].forEach(gpIdx => {
+            if (gpIdx !== null) {
+                const gp = navigator.getGamepads()[gpIdx];
+                if (gp && (Math.abs(gp.axes[0]) > 0.1 || gp.buttons[0].pressed || gp.buttons[1].pressed || gp.buttons[2].pressed)) {
+                    postChallengePaused = false;
+                }
+            }
+        });
+        if (postChallengePaused) return;
+    }
+    
     if (!levelTransitionPending && levelTimeline.length > 0 && nextLevelIndex < levelTimeline.length) { if (gameTime >= levelTimeline[nextLevelIndex].time) { levelTransitionPending = true; } }
 
     if (!levelTransitionPending) {
@@ -1897,12 +1921,13 @@ function update(dt) {
 
     players.forEach((p, i) => {
         if(p.dead) return;
-        if(p.rocketCooldown > 0) {
-            p.rocketCooldown -= dt;
-            if (p.rocketCooldown <= 0) {
-                // Cooldown finished, restore all missiles to max
-                p.currentMissiles = p.maxMissiles;
-                p.rocketCooldown = 0;
+        // Gradual missile reload: 1 missile every 2s (2 with Double Reload Speed)
+        if (p.hasRockets && p.currentMissiles < p.maxMissiles) {
+            p.missileReloadTimer += dt;
+            if (p.missileReloadTimer >= 2000) {
+                let amount = p.hasDoubleMissileSpeed ? 2 : 1;
+                p.currentMissiles = Math.min(p.currentMissiles + amount, p.maxMissiles);
+                p.missileReloadTimer = 0;
             }
         }
         
@@ -1919,13 +1944,10 @@ function update(dt) {
                     fireBlaster(p, 0);
                 }
                 if(keys['KeyZ'] && p.hasRockets && p.currentMissiles > 0) {
-                    // Fire all available missiles (no cooldown when counter visible)
                     let missilesToFire = p.currentMissiles;
                     launchRockets(p, missilesToFire); 
                     p.currentMissiles = 0;
-                    // Start reload timer
-                    let cooldown = p.hasDoubleMissileSpeed ? ROCKET_COOLDOWN / 2 : ROCKET_COOLDOWN;
-                    p.rocketCooldown = cooldown;
+                    p.missileReloadTimer = 0;
                     showToast(`P1 ${p.hasOchoMissiles ? 'Ocho' : 'Rockets'} Launched! (${missilesToFire} missiles)`); 
                 }
                 if(keys['KeyX'] && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(0); } 
@@ -1938,13 +1960,10 @@ function update(dt) {
                         fireBlaster(p, 0);
                     }
                     if(gp.buttons[1].pressed && p.hasRockets && p.currentMissiles > 0) {
-                        // Fire all available missiles (no cooldown when counter visible)
                         let missilesToFire = p.currentMissiles;
                         launchRockets(p, missilesToFire); 
                         p.currentMissiles = 0;
-                        // Start reload timer
-                        let cooldown = p.hasDoubleMissileSpeed ? ROCKET_COOLDOWN / 2 : ROCKET_COOLDOWN;
-                        p.rocketCooldown = cooldown;
+                        p.missileReloadTimer = 0;
                         showToast(`P1 ${p.hasOchoMissiles ? 'Ocho' : 'Rockets'} Launched! (${missilesToFire} missiles)`); 
                     }
                     if(gp.buttons[2].pressed && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(0); }
@@ -1961,13 +1980,10 @@ function update(dt) {
                     fireBlaster(p, 1);
                 }
                 if(keys['KeyQ'] && p.hasRockets && p.currentMissiles > 0) {
-                    // Fire all available missiles (no cooldown when counter visible)
                     let missilesToFire = p.currentMissiles;
                     launchRockets(p, missilesToFire); 
                     p.currentMissiles = 0;
-                    // Start reload timer
-                    let cooldown = p.hasDoubleMissileSpeed ? ROCKET_COOLDOWN / 2 : ROCKET_COOLDOWN;
-                    p.rocketCooldown = cooldown;
+                    p.missileReloadTimer = 0;
                     showToast(`P2 ${p.hasOchoMissiles ? 'Ocho' : 'Rockets'} Launched! (${missilesToFire} missiles)`); 
                 }
                 if(keys['KeyE'] && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(1); }
@@ -1982,13 +1998,10 @@ function update(dt) {
                             fireBlaster(p, 1);
                         }
                         if(gp.buttons[1].pressed && p.hasRockets && p.currentMissiles > 0) {
-                            // Fire all available missiles (no cooldown when counter visible)
                             let missilesToFire = p.currentMissiles;
                             launchRockets(p, missilesToFire); 
                             p.currentMissiles = 0;
-                            // Start reload timer
-                            let cooldown = p.hasDoubleMissileSpeed ? ROCKET_COOLDOWN / 2 : ROCKET_COOLDOWN;
-                            p.rocketCooldown = cooldown;
+                            p.missileReloadTimer = 0;
                             showToast(`P2 ${p.hasOchoMissiles ? 'Ocho' : 'Rockets'} Launched! (${missilesToFire} missiles)`); 
                         }
                         if(gp.buttons[2].pressed && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(1); }
@@ -2468,13 +2481,9 @@ function draw() {
     // Draw weapon loss message
     if(weaponLossMessage.timer > 0) { ctx.save(); ctx.fillStyle = "#ff4444"; ctx.font = "bold 36px Courier New"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.shadowColor = "#000"; ctx.shadowBlur = 10; ctx.fillText(weaponLossMessage.text, WIDTH/2, HEIGHT/2 + 50); ctx.restore(); }
     
-    // Draw Ocho missile counter (counts up by 2 during reload, synced to actual cooldown)
+    // Draw Ocho missile counter (shows current missile count during reload)
     players.forEach((p, i) => {
-        if (p.hasOchoMissiles && p.rocketCooldown > 0) {
-            let cooldown = p.hasDoubleMissileSpeed ? ROCKET_COOLDOWN / 2 : ROCKET_COOLDOWN;
-            let elapsed = cooldown - p.rocketCooldown;
-            let steps = p.maxMissiles / 2; // Count by 2s: 0, 2, 4, 6, 8
-            let currentCount = Math.min(p.maxMissiles, Math.floor((elapsed / cooldown) * steps) * 2);
+        if (p.hasOchoMissiles && p.currentMissiles < p.maxMissiles) {
             ctx.save();
             ctx.fillStyle = "#ff6600";
             ctx.font = "bold 48px Courier New";
@@ -2482,11 +2491,11 @@ function draw() {
             ctx.textBaseline = "middle";
             ctx.shadowColor = "#ffaa00";
             ctx.shadowBlur = 20;
-            ctx.fillText(`${currentCount}`, p.x + p.w/2, p.y - 40);
+            ctx.fillText(`${p.currentMissiles}`, p.x + p.w/2, p.y - 40);
             ctx.restore();
         }
     });
-    if(mathChallenge.active) { drawMathChallenge(); } else if(gamePaused || selectionPaused) { ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(0,0,WIDTH,HEIGHT); ctx.fillStyle = "#fff"; ctx.font = "40px Courier New"; ctx.textAlign = "center"; if (selectionPaused) { ctx.fillStyle = "#00ffff"; ctx.fillText("WEAPON SELECTION", WIDTH/2, HEIGHT/2); } else { ctx.fillText("PAUSED", WIDTH/2, HEIGHT/2); } ctx.restore(); }
+    if(mathChallenge.active) { drawMathChallenge(); } else if(gamePaused || selectionPaused || postChallengePaused) { ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(0,0,WIDTH,HEIGHT); ctx.fillStyle = "#fff"; ctx.font = "40px Courier New"; ctx.textAlign = "center"; if (selectionPaused) { ctx.fillStyle = "#00ffff"; ctx.fillText("WEAPON SELECTION", WIDTH/2, HEIGHT/2); } else { ctx.fillText("PAUSED", WIDTH/2, HEIGHT/2); } ctx.restore(); }
     
     // Update HUD with labels intact
     document.getElementById('p1Stats').innerHTML = `Reactor Power: ${Math.floor(p1Power)}%<br>Lives: ${players[0].lives}`; 
@@ -2496,6 +2505,13 @@ function draw() {
 
 window.addEventListener('keydown', e => { 
     keys[e.code] = true; 
+    // Clear post-challenge pause on any movement or fire key
+    if (postChallengePaused) {
+        const unpauseKeys = ['ArrowLeft', 'ArrowRight', 'ControlLeft', 'ShiftLeft', 'KeyZ', 'KeyX', 'KeyA', 'KeyD', 'KeyW', 'KeyQ', 'KeyE'];
+        if (unpauseKeys.includes(e.code)) {
+            postChallengePaused = false;
+        }
+    }
     if (mathChallenge.active) {
         if (e.key >= '0' && e.key <= '9') { mathChallenge.answerStr += e.key; } 
         else if (e.key === 'Backspace') { mathChallenge.answerStr = mathChallenge.answerStr.slice(0, -1); } 
