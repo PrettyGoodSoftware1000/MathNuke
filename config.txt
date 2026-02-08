@@ -6,17 +6,16 @@
 [Level 0] <LevelStart 0:00>
 [ShipsPerMin 30]
 
+[Shooters]
+<speed 80%>
+<PowerDropChance 15%>
+<NukeDropChance 1%>
+
 [Chargers]
 <speed 70%>
 <commonness 20%>
 <PowerDropChance 100%>
 <NukeDropChance 0%>
-
-[Shooters]
-<speed 80%>
-<commonness 75%>
-<PowerDropChance 15%>
-<NukeDropChance 1%>
 
 [Fatties]
 <speed 50%>
@@ -55,17 +54,16 @@
 [Level 2] <LevelStart 1:00>
 [ShipsPerMin 70]
 
+[Shooters]
+<speed 60%>
+<PowerDropChance 3%>
+<NukeDropChance 1%>
+
 [Chargers]
 <speed 100%>
 <commonness 10%>
 <PowerDropChance 100%>
 <NukeDropChance 0%>
-
-[Shooters]
-<speed 60%>
-<commonness 75%>
-<PowerDropChance 3%>
-<NukeDropChance 1%>
 
 [Fatties]
 <speed 50%>
@@ -97,9 +95,9 @@
 
 
 [Level 4] <LevelStart 3:00>
-[ShipsPerMin 205]
+[ShipsPerMin 125]
 
 [Event]{
-[2:05]
-[Fatties] <Count 15>
+[3:05]
+[Fatties] <Count 10>
 }
