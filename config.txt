@@ -1,10 +1,11 @@
 [Lives] <5>
+[EnergyCapsuleSpeed 8%]
 
 [PowerUpValve] <50%>
 [NukeSpeed] <15%>
 
 [Level 0] <LevelStart 0:00>
-[ShipsPerMin 30]
+[ShipsPerMin 45]
 
 [Shooters]
 <speed 80%>
@@ -25,15 +26,14 @@
 
 [Buggers]
 <speed 65%>
-<commonness 5%>
+<commonness 0%>
 <PowerDropChance 25%>
 <NukeDropChance 50%>
 
 [Level 1] <LevelStart 0:00>
+[ShipsPerMin 55]
 
-[ShipsPerMin 50]
 
-[EnergyCapsuleSpeed 8%]
 
 
 [Event]{
@@ -69,13 +69,13 @@
 <speed 50%>
 <commonness 0%>
 <PowerDropChance 50%>
-<NukeDropChance 100%>
+<NukeDropChance 50%>
 
 [Buggers]
 <speed 65%>
 <commonness 15%>
-<PowerDropChance 25%>
-<NukeDropChance 50%>
+<PowerDropChance 15%>
+<NukeDropChance 10%>
 
 
 
