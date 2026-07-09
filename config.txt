@@ -46,7 +46,7 @@
 [Buggers] <Count 2>
 }
 
-[0:50]
+[0:50]{
 [Buggers] <Count 3>
 }
 
