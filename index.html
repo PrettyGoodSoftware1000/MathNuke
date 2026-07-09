@@ -551,6 +551,11 @@ function getDifficultyMultiplier() {
     return 1;
 }
 
+// On easy, all enemies fire at half the normal rate
+function getEnemyFireRate() {
+    return difficulty === 'easy' ? 0.5 : 1;
+}
+
 function selectDifficulty(level) {
     difficulty = level;
     document.getElementById('btn-diff-easy').classList.toggle('selected', level === 'easy');
@@ -708,6 +713,52 @@ let mathChallenge = {
     customText: []
 };
 
+// --- CONTINUE CHALLENGE STATE (easy/normal: answer within 60s to keep going) ---
+const CONTINUE_TIME_LIMIT = 60000;
+let continueChallenge = {
+    active: false,
+    pIdx: -1,
+    timeLeft: 0,
+    num1: 0,
+    num2: 0,
+    operator: 'x',
+    correctAnswer: 0,
+    answerStr: "",
+    feedback: ""
+};
+
+// Random math problem: 0=multiply, 1=add, 2=subtract
+function generateMathProblem() {
+    let challengeType = Math.floor(Math.random() * 3);
+    let n1, n2, correctAnswer, operator;
+
+    if (challengeType === 0) {
+        // Multiplication: up to 12 x 12
+        n1 = Math.floor(Math.random() * 12) + 1;
+        n2 = Math.floor(Math.random() * 12) + 1;
+        correctAnswer = n1 * n2;
+        operator = 'x';
+    } else if (challengeType === 1) {
+        // Addition: half the time one of the numbers is over 100
+        if (Math.random() < 0.5) {
+            n1 = Math.floor(Math.random() * 899) + 101; // 101-999 (over 100)
+        } else {
+            n1 = Math.floor(Math.random() * 90) + 10;   // 10-99 (2 digit)
+        }
+        n2 = Math.floor(Math.random() * 99) + 1;        // 1-99 (1-2 digit)
+        correctAnswer = n1 + n2;
+        operator = '+';
+    } else {
+        // Subtraction: 2 digit number - 1-2 digit number (ensure positive result)
+        n1 = Math.floor(Math.random() * 90) + 10; // 10-99 (2 digit)
+        n2 = Math.floor(Math.random() * 99) + 1;  // 1-99 (1-2 digit)
+        if (n2 > n1) { let temp = n1; n1 = n2; n2 = temp; }
+        correctAnswer = n1 - n2;
+        operator = '-';
+    }
+    return { num1: n1, num2: n2, operator: operator, correctAnswer: correctAnswer };
+}
+
 // --- TIMER & LEVEL ---
 let gameTime = 0;
 let showTimer = false;
@@ -835,8 +886,8 @@ const PLAYER_START_Y = HEIGHT - 70;
 
 function initPlayers() {
     return [
-        { x: WIDTH * 0.25, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false },
-        { x: WIDTH * 0.75, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false }
+        { x: WIDTH * 0.25, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false },
+        { x: WIDTH * 0.75, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false }
     ];
 }
 const players = initPlayers();
@@ -1248,9 +1299,9 @@ function getDropRateMultiplier() {
 function handlePlayerHit(p, pIdx) {
     if (p.state !== 'active' || p.shieldTimer > 0) return;
     
-    // Check for Power Shield
+    // Check for Power Shield (on easy, shatter shield takes an extra hit)
     if (p.hasPowerShield) {
-        let maxHits = p.shatterShieldLevel > 0 ? p.shatterShieldLevel : 1;
+        let maxHits = p.shatterShieldLevel > 0 ? p.shatterShieldLevel + (difficulty === 'easy' ? 1 : 0) : 1;
         if (p.powerShieldHits < maxHits) {
             // Shield takes hit but doesn't shatter yet
             p.powerShieldHits++;
@@ -1288,14 +1339,77 @@ function handlePlayerHit(p, pIdx) {
     }
     
     p.lives--; createExplosion(p.x+p.w/2, p.y+p.h/2, '#ffaa00', 2.0); sfx.explosion('fatty');
-    
-    // Destroy a random weapon when losing a life
-    destroyRandomWeapon(p, pIdx);
-    
+
+    // Destroy a random weapon when losing a life (on easy, only every 2nd death)
+    p.deathsSinceWeaponLoss++;
+    if (difficulty !== 'easy' || p.deathsSinceWeaponLoss >= 2) {
+        destroyRandomWeapon(p, pIdx);
+        p.deathsSinceWeaponLoss = 0;
+    }
+
     // Death effect: force ShipsPerMin to 0 for 10 seconds (takes precedence over all other modifiers)
     deathShipsPerMinTimer = 10000;
-    
-    if (p.lives <= 0) { p.dead = true; } else { p.state = 'respawning'; p.respawnTimer = 3000; }
+
+    if (p.lives <= 0) {
+        p.dead = true;
+        // On easy and normal, offer a timed math challenge to continue
+        if (difficulty !== 'hard') startContinueChallenge(pIdx);
+    } else { p.state = 'respawning'; p.respawnTimer = 3000; }
+}
+
+function startContinueChallenge(pIdx) {
+    const problem = generateMathProblem();
+    continueChallenge = {
+        active: true,
+        pIdx: pIdx,
+        timeLeft: CONTINUE_TIME_LIMIT,
+        num1: problem.num1,
+        num2: problem.num2,
+        operator: problem.operator,
+        correctAnswer: problem.correctAnswer,
+        answerStr: "",
+        feedback: ""
+    };
+}
+
+function resolveContinueChallenge(success) {
+    let pIdx = continueChallenge.pIdx;
+    continueChallenge.active = false;
+    if (success) {
+        let p = players[pIdx];
+        p.dead = false;
+        p.lives = defaultLives;
+        p.state = 'entering';
+        p.x = (pIdx === 0) ? WIDTH * 0.25 : WIDTH * 0.75;
+        p.y = HEIGHT + 64;
+        showToast((pIdx === 0 ? "P1" : "P2") + " CONTINUES!");
+    } else {
+        showToast((pIdx === 0 ? "P1" : "P2") + " is out of the fight!");
+    }
+}
+
+function drawContinueChallenge() {
+    ctx.save();
+    ctx.fillStyle = "#000"; ctx.strokeStyle = "#ff0055"; ctx.lineWidth = 4;
+    let bx = WIDTH/2 - 250, by = HEIGHT/2 - 200;
+    ctx.fillRect(bx, by, 500, 400); ctx.strokeRect(bx, by, 500, 400);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ff0055"; ctx.font = "bold 48px Courier New";
+    ctx.fillText("CONTINUE?", WIDTH/2, by + 70);
+    ctx.fillStyle = "#fff"; ctx.font = "18px Courier New";
+    ctx.fillText((continueChallenge.pIdx === 0 ? "P1" : "P2") + " is down! Solve to keep fighting:", WIDTH/2, by + 110);
+    let secondsLeft = Math.max(0, Math.ceil(continueChallenge.timeLeft / 1000));
+    ctx.fillStyle = secondsLeft <= 10 ? "#ff0000" : "#ffff00"; ctx.font = "bold 36px Courier New";
+    ctx.fillText(secondsLeft + "s", WIDTH/2, by + 160);
+    ctx.font = "40px Courier New"; ctx.fillStyle = "#ffff00";
+    ctx.fillText(`${continueChallenge.num1} ${continueChallenge.operator} ${continueChallenge.num2} = ?`, WIDTH/2, by + 230);
+    ctx.font = "32px Courier New"; ctx.fillStyle = "#00ff00";
+    ctx.fillText(continueChallenge.answerStr + "_", WIDTH/2, by + 290);
+    if (continueChallenge.feedback) {
+        ctx.fillStyle = "#ff0000"; ctx.font = "24px Courier New";
+        ctx.fillText(continueChallenge.feedback, WIDTH/2, by + 350);
+    }
+    ctx.restore();
 }
 
 function updateNukeDisplay() {
@@ -1373,32 +1487,8 @@ window.selectWeapon = function(playerIndex, weaponId) {
     document.getElementById('p1-menu').style.display = 'none';
     document.getElementById('p2-menu').style.display = 'none';
     
-    // Generate random math challenge type: 0=multiply, 1=add, 2=subtract
-    let challengeType = Math.floor(Math.random() * 3);
-    let n1, n2, correctAnswer, operator;
-    
-    if (challengeType === 0) {
-        // Multiplication: up to 12 x 12
-        n1 = Math.floor(Math.random() * 12) + 1;
-        n2 = Math.floor(Math.random() * 12) + 1;
-        correctAnswer = n1 * n2;
-        operator = 'x';
-    } else if (challengeType === 1) {
-        // Addition: 1-2 digit number + 2 digit number
-        n1 = Math.floor(Math.random() * 90) + 10; // 10-99 (2 digit)
-        n2 = Math.floor(Math.random() * 99) + 1;  // 1-99 (1-2 digit)
-        correctAnswer = n1 + n2;
-        operator = '+';
-    } else {
-        // Subtraction: 2 digit number - 1-2 digit number (ensure positive result)
-        n1 = Math.floor(Math.random() * 90) + 10; // 10-99 (2 digit)
-        n2 = Math.floor(Math.random() * 99) + 1;  // 1-99 (1-2 digit)
-        // Ensure n1 >= n2 for positive result
-        if (n2 > n1) { let temp = n1; n1 = n2; n2 = temp; }
-        correctAnswer = n1 - n2;
-        operator = '-';
-    }
-    
+    const problem = generateMathProblem();
+
     let textLines = ["Your ship requires a calculation to", "install your new weapon system upgrade."];
     
     // Set custom text based on weapon ID
@@ -1428,16 +1518,16 @@ window.selectWeapon = function(playerIndex, weaponId) {
         textLines = ["Woah, baby! How many Nukes can we jam", "in this bad boy? Just get the arming", "codes set."]; 
     }
 
-    mathChallenge = { 
-        active: true, 
-        pIdx: playerIndex, 
-        wId: weaponId, 
-        num1: n1, 
-        num2: n2, 
-        operator: operator, 
-        correctAnswer: correctAnswer, 
-        answerStr: "", 
-        feedback: "", 
+    mathChallenge = {
+        active: true,
+        pIdx: playerIndex,
+        wId: weaponId,
+        num1: problem.num1,
+        num2: problem.num2,
+        operator: problem.operator,
+        correctAnswer: problem.correctAnswer,
+        answerStr: "",
+        feedback: "",
         customText: textLines,
         multiChallenge: weaponId === 100 ? 3 : 1, // 3 challenges for Reload Nukes
         challengesCompleted: 0
@@ -1895,7 +1985,15 @@ function update(dt) {
     }
     
     if(!gameStarted || gameOver) return;
-    if(gamePaused || selectionPaused) return; 
+
+    // Continue challenge: gameplay freezes while the 60s countdown runs
+    if (continueChallenge.active) {
+        continueChallenge.timeLeft -= dt;
+        if (continueChallenge.timeLeft <= 0) resolveContinueChallenge(false);
+        return;
+    }
+
+    if(gamePaused || selectionPaused) return;
     
     // Post-challenge pause: check for gamepad input to unpause
     if (postChallengePaused) {
@@ -2278,7 +2376,7 @@ function update(dt) {
 
     for(let i=enemies.length-1; i>=0; i--) {
         let e = enemies[i];
-        if(e.type === 'charger') { e.y += 0.25 * e.speedMult * dt; } else if(e.type === 'fatty') { e.y += 0.04 * e.speedMult * dt; if(Math.random() < 0.01) { let target = null, minDist = 99999; players.forEach(p => { if(!p.dead && p.state === 'active') { let dist = Math.hypot(p.x - e.x, p.y - e.y); if(dist < minDist) { minDist = dist; target = p; } } }); let vx = 0, vy = 0.3 * dt; if(target) { let angle = Math.atan2(target.y - e.y, target.x - e.x); vx = Math.cos(angle)*0.3*dt; vy = Math.sin(angle)*0.3*dt; } eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, type: 'rocket', vx: vx, vy: vy}); sfx.enemyShoot(true); } } else if(e.type === 'shooter') { let targetY = SWARM.yBase + (e.gridRow * 40); let targetX = (WIDTH/2) + SWARM.xOffset + ((e.gridCol - SWARM.cols/2) * 40); if(e.state === 'entering') { e.y += 0.2 * e.speedMult * dt; e.x += (targetX - e.x) * 0.05; if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; } } else { e.y = targetY; e.x = targetX; if(Math.random() < 0.002) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: 0, vy: 0.4*dt}); sfx.enemyShoot(false); } } } else if (e.type === 'bugger') { if (e.state === 'moving') { e.angle += 0.003 * dt; e.centerY += 0.1 * e.speedMult * dt; e.x = e.centerX + Math.cos(e.angle) * 60; e.y = e.centerY + Math.sin(e.angle) * 30; e.rotation = lerpAngle(e.rotation, Math.atan2((e.centerY+0.1*e.speedMult*dt+Math.sin(e.angle+0.1)*30)-e.y, (e.centerX+Math.cos(e.angle+0.1)*60)-e.x)+Math.PI/2, 0.1*dt/16); if(Math.random() < 0.005) { e.state = 'aiming'; e.stopTimer = 500; } } else if (e.state === 'aiming') { e.stopTimer -= dt; let target = (!players[0].dead) ? players[0] : players[1]; if (!players[1].dead && Math.abs(players[1].x - e.x) < Math.abs(players[0].x - e.x)) target = players[1]; e.rotation = lerpAngle(e.rotation, Math.atan2(target.y - e.y, target.x - e.x) - Math.PI/2, 0.1 * dt/16); e.aimAngle = e.rotation; if (e.stopTimer <= 0) { e.state = 'bursting'; e.burstCount = 3; e.stopTimer = 0; } } else if (e.state === 'bursting') { e.stopTimer += dt; if (e.stopTimer > 100) { eBullets.push({ x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: Math.cos(e.aimAngle+Math.PI/2)*0.3*dt, vy: Math.sin(e.aimAngle+Math.PI/2)*0.3*dt }); sfx.enemyShoot(false); e.burstCount--; e.stopTimer = 0; if(e.burstCount <= 0) e.state = 'moving'; } } }
+        if(e.type === 'charger') { e.y += 0.25 * e.speedMult * dt; } else if(e.type === 'fatty') { e.y += 0.04 * e.speedMult * dt; if(Math.random() < 0.01 * getEnemyFireRate()) { let target = null, minDist = 99999; players.forEach(p => { if(!p.dead && p.state === 'active') { let dist = Math.hypot(p.x - e.x, p.y - e.y); if(dist < minDist) { minDist = dist; target = p; } } }); let vx = 0, vy = 0.3 * dt; if(target) { let angle = Math.atan2(target.y - e.y, target.x - e.x); vx = Math.cos(angle)*0.3*dt; vy = Math.sin(angle)*0.3*dt; } eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, type: 'rocket', vx: vx, vy: vy}); sfx.enemyShoot(true); } } else if(e.type === 'shooter') { let targetY = SWARM.yBase + (e.gridRow * 40); let targetX = (WIDTH/2) + SWARM.xOffset + ((e.gridCol - SWARM.cols/2) * 40); if(e.state === 'entering') { e.y += 0.2 * e.speedMult * dt; e.x += (targetX - e.x) * 0.05; if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; } } else { e.y = targetY; e.x = targetX; if(Math.random() < 0.002 * getEnemyFireRate()) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: 0, vy: 0.4*dt}); sfx.enemyShoot(false); } } } else if (e.type === 'bugger') { if (e.state === 'moving') { e.angle += 0.003 * dt; e.centerY += 0.1 * e.speedMult * dt; e.x = e.centerX + Math.cos(e.angle) * 60; e.y = e.centerY + Math.sin(e.angle) * 30; e.rotation = lerpAngle(e.rotation, Math.atan2((e.centerY+0.1*e.speedMult*dt+Math.sin(e.angle+0.1)*30)-e.y, (e.centerX+Math.cos(e.angle+0.1)*60)-e.x)+Math.PI/2, 0.1*dt/16); if(Math.random() < 0.005 * getEnemyFireRate()) { e.state = 'aiming'; e.stopTimer = 500; } } else if (e.state === 'aiming') { e.stopTimer -= dt; let target = (!players[0].dead) ? players[0] : players[1]; if (!players[1].dead && Math.abs(players[1].x - e.x) < Math.abs(players[0].x - e.x)) target = players[1]; e.rotation = lerpAngle(e.rotation, Math.atan2(target.y - e.y, target.x - e.x) - Math.PI/2, 0.1 * dt/16); e.aimAngle = e.rotation; if (e.stopTimer <= 0) { e.state = 'bursting'; e.burstCount = 3; e.stopTimer = 0; } } else if (e.state === 'bursting') { e.stopTimer += dt; if (e.stopTimer > 100) { eBullets.push({ x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: Math.cos(e.aimAngle+Math.PI/2)*0.3*dt, vy: Math.sin(e.aimAngle+Math.PI/2)*0.3*dt }); sfx.enemyShoot(false); e.burstCount--; e.stopTimer = 0; if(e.burstCount <= 0) e.state = 'moving'; } } }
         if(e.flashTimer > 0) e.flashTimer--;
         let destroyed = false;
         for(let bIdx=pBullets.length-1; bIdx>=0; bIdx--) {
@@ -2361,7 +2459,7 @@ function update(dt) {
         if(!collected && c.y > HEIGHT) capsules.splice(i, 1);
     }
 
-    if(players[0].dead && players[1].dead) { if(!gameOver) { let best = Math.max(p1Power, p2Power); if(best > highPower) { highPower = best; localStorage.setItem('galago_high_power', highPower); } } gameOver = true; }
+    if(players[0].dead && players[1].dead && !continueChallenge.active) { if(!gameOver) { let best = Math.max(p1Power, p2Power); if(best > highPower) { highPower = best; localStorage.setItem('galago_high_power', highPower); } } gameOver = true; }
     for(let i=particles.length-1; i>=0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05; if(p.life <= 0) particles.splice(i, 1); }
     updateBullets(pBullets, -0.6, dt); 
     for(let i=eBullets.length-1; i>=0; i--) { let b = eBullets[i]; b.x += b.vx || 0; b.y += b.vy; if (b.type === 'rocket') { if (Math.random() < 0.3) particles.push({ x: b.x+12, y: b.y, vx: (Math.random()-0.5), vy: -1, life: 0.5, color: '#aaa', size: 3 }); } if(b.y > HEIGHT || b.x < 0 || b.x > WIDTH) eBullets.splice(i, 1); }
@@ -2518,7 +2616,7 @@ function draw() {
     }
     // Draw weapon loss message
     if(weaponLossMessage.timer > 0) { ctx.save(); ctx.fillStyle = "#ff4444"; ctx.font = "bold 36px Courier New"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.shadowColor = "#000"; ctx.shadowBlur = 10; ctx.fillText(weaponLossMessage.text, WIDTH/2, HEIGHT/2 + 50); ctx.restore(); }
-    if(mathChallenge.active) { drawMathChallenge(); } else if(gamePaused || selectionPaused || postChallengePaused) { ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(0,0,WIDTH,HEIGHT); ctx.fillStyle = "#fff"; ctx.font = "40px Courier New"; ctx.textAlign = "center"; if (selectionPaused) { ctx.fillStyle = "#00ffff"; ctx.fillText("WEAPON SELECTION", WIDTH/2, HEIGHT/2); } else { ctx.fillText("PAUSED", WIDTH/2, HEIGHT/2); } ctx.restore(); }
+    if(continueChallenge.active) { drawContinueChallenge(); } else if(mathChallenge.active) { drawMathChallenge(); } else if(gamePaused || selectionPaused || postChallengePaused) { ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(0,0,WIDTH,HEIGHT); ctx.fillStyle = "#fff"; ctx.font = "40px Courier New"; ctx.textAlign = "center"; if (selectionPaused) { ctx.fillStyle = "#00ffff"; ctx.fillText("WEAPON SELECTION", WIDTH/2, HEIGHT/2); } else { ctx.fillText("PAUSED", WIDTH/2, HEIGHT/2); } ctx.restore(); }
     
     // Update HUD with labels intact
     document.getElementById('p1Stats').innerHTML = `Reactor Power: ${Math.floor(p1Power)}%<br>Lives: ${players[0].lives}`; 
@@ -2535,8 +2633,28 @@ window.addEventListener('keydown', e => {
             postChallengePaused = false;
         }
     }
+    if (continueChallenge.active) {
+        if (e.key >= '0' && e.key <= '9') { continueChallenge.answerStr += e.key; }
+        else if (e.key === 'Backspace') { continueChallenge.answerStr = continueChallenge.answerStr.slice(0, -1); }
+        else if (e.key === '`' || e.code === 'Backquote') { continueChallenge.answerStr = continueChallenge.correctAnswer.toString(); }
+        else if (e.key === 'Enter') {
+            if (parseInt(continueChallenge.answerStr) === continueChallenge.correctAnswer) {
+                resolveContinueChallenge(true);
+            } else {
+                // Wrong answer: new problem, timer keeps running
+                continueChallenge.feedback = "Wrong! Try this one:";
+                continueChallenge.answerStr = "";
+                const problem = generateMathProblem();
+                continueChallenge.num1 = problem.num1;
+                continueChallenge.num2 = problem.num2;
+                continueChallenge.operator = problem.operator;
+                continueChallenge.correctAnswer = problem.correctAnswer;
+            }
+        }
+        return;
+    }
     if (mathChallenge.active) {
-        if (e.key >= '0' && e.key <= '9') { mathChallenge.answerStr += e.key; } 
+        if (e.key >= '0' && e.key <= '9') { mathChallenge.answerStr += e.key; }
         else if (e.key === 'Backspace') { mathChallenge.answerStr = mathChallenge.answerStr.slice(0, -1); } 
         else if (e.key === '`' || e.code === 'Backquote') { mathChallenge.answerStr = mathChallenge.correctAnswer.toString(); } 
         else if (e.key === 'Enter') { 
@@ -2550,28 +2668,11 @@ window.addEventListener('keydown', e => {
                         mathChallenge.feedback = `Correct! (${mathChallenge.challengesCompleted}/${mathChallenge.multiChallenge})`;
                         mathChallenge.answerStr = "";
                         // Generate new problem
-                        let challengeType = Math.floor(Math.random() * 3);
-                        if (challengeType === 0) {
-                            mathChallenge.num1 = Math.floor(Math.random() * 12) + 1;
-                            mathChallenge.num2 = Math.floor(Math.random() * 12) + 1;
-                            mathChallenge.correctAnswer = mathChallenge.num1 * mathChallenge.num2;
-                            mathChallenge.operator = 'x';
-                        } else if (challengeType === 1) {
-                            mathChallenge.num1 = Math.floor(Math.random() * 90) + 10;
-                            mathChallenge.num2 = Math.floor(Math.random() * 99) + 1;
-                            mathChallenge.correctAnswer = mathChallenge.num1 + mathChallenge.num2;
-                            mathChallenge.operator = '+';
-                        } else {
-                            mathChallenge.num1 = Math.floor(Math.random() * 90) + 10;
-                            mathChallenge.num2 = Math.floor(Math.random() * 99) + 1;
-                            if (mathChallenge.num2 > mathChallenge.num1) { 
-                                let temp = mathChallenge.num1; 
-                                mathChallenge.num1 = mathChallenge.num2; 
-                                mathChallenge.num2 = temp; 
-                            }
-                            mathChallenge.correctAnswer = mathChallenge.num1 - mathChallenge.num2;
-                            mathChallenge.operator = '-';
-                        }
+                        const problem = generateMathProblem();
+                        mathChallenge.num1 = problem.num1;
+                        mathChallenge.num2 = problem.num2;
+                        mathChallenge.operator = problem.operator;
+                        mathChallenge.correctAnswer = problem.correctAnswer;
                     } else {
                         // All challenges completed!
                         mathChallenge.feedback = "PERFECT!\nAll codes accepted!";
