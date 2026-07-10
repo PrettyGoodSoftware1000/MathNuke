@@ -24,29 +24,31 @@
             font-family: 'Courier New', Courier, monospace;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
-            min-height: 100vh;
-            overflow: auto;
-            padding: 20px 0;
+            height: 100vh;
+            overflow: hidden;
+            padding: 4px 0;
         }
         
         #content-wrapper {
             display: flex;
             flex-direction: column;
             align-items: center;
-            width: 100%;
+            width: fit-content;
         }
         
         #hud {
             width: 960px;
-            margin: 0 auto 5px auto; 
+            margin: 0 auto 4px auto;
             display: flex;
             justify-content: space-between;
+            align-items: center;
             font-weight: bold;
             color: #00ffff;
-            font-size: 18px;
-            line-height: 1.4em;
+            font-size: 16px;
+            line-height: 1.2em;
+            white-space: nowrap;
         }
 
         #main-row {
@@ -155,10 +157,10 @@
 
         #nuke-inventory-container {
             width: 960px;
-            margin: 5px auto 0 auto;
+            margin: 2px auto 0 auto;
             display: flex;
             justify-content: space-between;
-            height: 40px;
+            height: 22px;
         }
         .nuke-slot {
             display: flex;
@@ -181,10 +183,10 @@
 
         #rocket-inventory-container {
             width: 960px;
-            margin: 5px auto 0 auto;
+            margin: 2px auto 0 auto;
             display: flex;
             justify-content: space-between;
-            height: 30px;
+            height: 26px;
         }
         .rocket-slot {
             display: flex;
@@ -471,12 +473,12 @@
     
     <div id="content-wrapper">
         <div id="hud">
-            <div id="p1Stats">Reactor Power: 0%<br>Lives: <span id="p1-lives">25</span></div>
-            <div style="display:flex; flex-direction:column; align-items:center;">
-                <div id="gameTitle" style="color:#ff0055; font-size: 24px; font-weight: bold;">MATH NUKE</div>
-                <div id="levelIndicator" style="color: #ffff00; font-size: 20px; font-weight: bold; margin-top: 4px;">LEVEL 1</div>
+            <div id="p1Stats">Reactor Power: 0% | Lives: 25</div>
+            <div style="display:flex; align-items:baseline; gap:15px;">
+                <div id="gameTitle" style="color:#ff0055; font-size: 22px; font-weight: bold;">MATH NUKE</div>
+                <div id="levelIndicator" style="color: #ffff00; font-size: 18px; font-weight: bold;">LEVEL 1</div>
             </div>
-            <div id="p2Stats" style="text-align: right;">Reactor Power: 0%<br>Lives: <span id="p2-lives">25</span></div>
+            <div id="p2Stats" style="text-align: right;">Reactor Power: 0% | Lives: 25</div>
         </div>
 
         <div id="main-row">
@@ -556,6 +558,11 @@ function getEnemyFireRate() {
     return difficulty === 'easy' ? 0.5 : 1;
 }
 
+// Enemies never fire from the bottom 5% of the screen
+function canEnemyFire(e) {
+    return (e.y + e.h) < HEIGHT * 0.95;
+}
+
 function selectDifficulty(level) {
     difficulty = level;
     document.getElementById('btn-diff-easy').classList.toggle('selected', level === 'easy');
@@ -580,6 +587,19 @@ function updateSetupControlsInfo() {
     lines.push('<strong>O</strong> Fill Power | <strong>T</strong> Timer | <strong>P</strong> Pause');
     document.getElementById('setup-controls-list').innerHTML = lines.join('<br>');
 }
+
+// --- FIT TO WINDOW ---
+// Scale the whole game so it always fits the browser window (no scrollbar)
+function fitToWindow() {
+    const wrapper = document.getElementById('content-wrapper');
+    wrapper.style.transform = 'none';
+    const w = wrapper.scrollWidth;
+    const h = wrapper.scrollHeight;
+    const scale = Math.min(window.innerWidth / w, (window.innerHeight - 8) / h);
+    wrapper.style.transformOrigin = 'top center';
+    wrapper.style.transform = 'scale(' + scale + ')';
+}
+window.addEventListener('resize', fitToWindow);
 
 // --- DEBUG TOGGLE ---
 function toggleDebug() {
@@ -884,10 +904,35 @@ const assets = {
 const BASE_BLASTER_CD = 400; // Base cooldown (half of original 200)
 const PLAYER_START_Y = HEIGHT - 70;
 
+// Charged Shot: hold fire to charge a penetrating 5x-damage beam
+const CHARGE_TIME_NORMAL = 3000;
+const CHARGE_TIME_FAST = 2000;
+const CHARGED_SHOT_DAMAGE = 5;
+function isChargeReady(p) {
+    return p.hasChargedShot && p.chargeTimer >= (p.hasFastCharge ? CHARGE_TIME_FAST : CHARGE_TIME_NORMAL);
+}
+
+// Cached blue-tinted copies of the ship sprites for the charge-ready flash
+const chargeTintCache = new Map();
+function getChargeTintedSprite(img) {
+    let tinted = chargeTintCache.get(img);
+    if (!tinted) {
+        tinted = document.createElement('canvas');
+        tinted.width = img.width; tinted.height = img.height;
+        const tctx = tinted.getContext('2d');
+        tctx.drawImage(img, 0, 0);
+        tctx.globalCompositeOperation = 'source-atop';
+        tctx.fillStyle = '#00aaff';
+        tctx.fillRect(0, 0, tinted.width, tinted.height);
+        chargeTintCache.set(img, tinted);
+    }
+    return tinted;
+}
+
 function initPlayers() {
     return [
-        { x: WIDTH * 0.25, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false },
-        { x: WIDTH * 0.75, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false }
+        { x: WIDTH * 0.25, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, hasChargedShot: false, hasFastCharge: false, chargeTimer: 0, hasCollectedFirstPowerUp: false },
+        { x: WIDTH * 0.75, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, hasChargedShot: false, hasFastCharge: false, chargeTimer: 0, hasCollectedFirstPowerUp: false }
     ];
 }
 const players = initPlayers();
@@ -1068,8 +1113,8 @@ setupFileLoader('btnLoadConfig', 'configFile', (text) => {
         players[0].lives = defaultLives;
         players[1].lives = defaultLives;
         // Update HUD with new lives value
-        document.getElementById('p1Stats').innerHTML = `Reactor Power: ${Math.floor(p1Power)}%<br>Lives: ${defaultLives}`;
-        document.getElementById('p2Stats').innerHTML = `Reactor Power: ${Math.floor(p2Power)}%<br>Lives: ${defaultLives}`;
+        document.getElementById('p1Stats').innerHTML = `Reactor Power: ${Math.floor(p1Power)}% | Lives: ${defaultLives}`;
+        document.getElementById('p2Stats').innerHTML = `Reactor Power: ${Math.floor(p2Power)}% | Lives: ${defaultLives}`;
     }
     canvas.focus();
 });
@@ -1090,11 +1135,13 @@ setupFileLoader('btnLoadP2', 'p2SpriteInput', (data) => loadSprite(data, 'p2'));
 // Automatic P1/P2 PNG loading from local folder
 window.addEventListener('load', () => {
     // Initialize HUD text immediately
-    document.getElementById('p1Stats').innerHTML = `Reactor Power: 0%<br>Lives: ${defaultLives}`;
-    document.getElementById('p2Stats').innerHTML = `Reactor Power: 0%<br>Lives: ${defaultLives}`;
+    document.getElementById('p1Stats').innerHTML = `Reactor Power: 0% | Lives: ${defaultLives}`;
+    document.getElementById('p2Stats').innerHTML = `Reactor Power: 0% | Lives: ${defaultLives}`;
     document.getElementById('gameTitle').textContent = 'MATH NUKE';
     document.getElementById('levelIndicator').textContent = 'LEVEL 1';
     updateSetupControlsInfo();
+    updateWeaponMenuButtons();
+    fitToWindow();
 
     // Try to load config.txt
     fetch('config.txt?t=' + Date.now())
@@ -1106,8 +1153,8 @@ window.addEventListener('load', () => {
                 players[0].lives = defaultLives;
                 players[1].lives = defaultLives;
                 // Update HUD with lives from config
-                document.getElementById('p1Stats').innerHTML = `Reactor Power: 0%<br>Lives: ${defaultLives}`;
-                document.getElementById('p2Stats').innerHTML = `Reactor Power: 0%<br>Lives: ${defaultLives}`;
+                document.getElementById('p1Stats').innerHTML = `Reactor Power: 0% | Lives: ${defaultLives}`;
+                document.getElementById('p2Stats').innerHTML = `Reactor Power: 0% | Lives: ${defaultLives}`;
             }
         })
         .catch(e => console.log("Manual config load required"));
@@ -1142,6 +1189,36 @@ const sfx = {
         osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15);
         gain.gain.setValueAtTime(0.05, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
         osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+    },
+    correct: () => {
+        // Positive ascending arpeggio for a correct math answer
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        [523.25, 659.25, 783.99].forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            const t = audioCtx.currentTime + idx * 0.09;
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.linearRampToValueAtTime(0.12, t + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t + 0.3);
+        });
+    },
+    bonus: () => {
+        // Fanfare when a bonus question appears
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        [440, 554.37, 659.25, 880].forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = 'square';
+            const t = audioCtx.currentTime + idx * 0.07;
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.linearRampToValueAtTime(0.08, t + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t + 0.4);
+        });
     },
     rocketLaunch: () => {
         if(audioCtx.state === 'suspended') audioCtx.resume();
@@ -1226,7 +1303,8 @@ function destroyRandomWeapon(p, pIdx) {
         let shieldName = p.shatterShieldLevel > 0 ? "Shatter Shield x5" : "Power Shield";
         weapons.push({ name: shieldName, destroy: () => { p.hasPowerShield = false; p.powerShieldHits = 0; p.shatterShieldLevel = 0; } });
     }
-    
+    if (p.hasChargedShot) weapons.push({ name: "Charged Shot", destroy: () => { p.hasChargedShot = false; p.hasFastCharge = false; p.chargeTimer = 0; } });
+
     if (weapons.length > 0) {
         let chosen = weapons[Math.floor(Math.random() * weapons.length)];
         chosen.destroy();
@@ -1251,7 +1329,14 @@ function countUpgrades(p) {
     if (p.hasClusterNukes) count++;
     if (p.hasPowerShield) count++;
     if (p.shatterShieldLevel > 0) count++;
+    if (p.hasChargedShot) count++;
+    if (p.hasFastCharge) count++;
     return count;
+}
+
+// Bonus question chance on easy/normal (drops once the player has 5 power ups)
+function getBonusQuestionChance(p) {
+    return countUpgrades(p) >= 5 ? 0.10 : 0.35;
 }
 
 // Calculate ShipsPerMin boost based on player upgrades and enemy count
@@ -1279,7 +1364,7 @@ function getShipsPerMinBoost() {
 
 // Calculate power up drop rate multiplier based on upgrades
 // Goes from 1.0 (0 upgrades) to 0.05 (all upgrades)
-const MAX_UPGRADES = 13; // Total possible upgrades
+const MAX_UPGRADES = 15; // Total possible upgrades
 function getDropRateMultiplier() {
     // Get the max upgrades across all players
     let maxUpgrades = 0;
@@ -1501,8 +1586,11 @@ window.selectWeapon = function(playerIndex, weaponId) {
     else if (weaponId === 2) { 
         textLines = ["Your engineering crew can't figure out", "how to install your rockets.", "Help them with the math."]; 
     }
-    else if (weaponId === 4) { 
-        textLines = ["Shield generator calibration required...", "Enter the frequency harmonics."]; 
+    else if (weaponId === 4) {
+        textLines = ["Shield generator calibration required...", "Enter the frequency harmonics."];
+    }
+    else if (weaponId === 5 || weaponId === 51) {
+        textLines = ["Charge capacitors require precise", "energy calculations."];
     }
     else if (weaponId === 11) { 
         textLines = ["Triple blaster alignment needed.", "Calculate the power distribution."]; 
@@ -1530,10 +1618,27 @@ window.selectWeapon = function(playerIndex, weaponId) {
         feedback: "",
         customText: textLines,
         multiChallenge: weaponId === 100 ? 3 : 1, // 3 challenges for Reload Nukes
-        challengesCompleted: 0
+        challengesCompleted: 0,
+        isBonus: false
     };
     selectionPaused = true; canvas.focus();
 };
+
+// On easy/normal a correct answer can trigger a bonus multiplication question;
+// answering it correctly awards full power. Returns true if a bonus started.
+function maybeStartBonusQuestion() {
+    if (difficulty === 'hard') return false;
+    if (Math.random() >= getBonusQuestionChance(players[mathChallenge.pIdx])) return false;
+    sfx.bonus();
+    mathChallenge.isBonus = true;
+    mathChallenge.num1 = Math.floor(Math.random() * 12) + 1;
+    mathChallenge.num2 = Math.floor(Math.random() * 12) + 1;
+    mathChallenge.operator = 'x';
+    mathChallenge.correctAnswer = mathChallenge.num1 * mathChallenge.num2;
+    mathChallenge.answerStr = "";
+    mathChallenge.feedback = "BONUS QUESTION!\nSolve for FULL POWER!";
+    return true;
+}
 
 function finalizeUpgrade(success) {
     let pIdx = mathChallenge.pIdx; let wId = mathChallenge.wId;
@@ -1576,8 +1681,12 @@ function finalizeUpgrade(success) {
             weaponName = "Cluster Nukes";
         }
         
+        // Charged Shot: 5=unlock, 51=faster charge (2s)
+        else if (wId === 5) { p.hasChargedShot = true; p.chargeTimer = 0; weaponName = "Charged Shot"; }
+        else if (wId === 51) { p.hasFastCharge = true; weaponName = "Fast Charge"; }
+
         // Power Shield
-        else if (wId === 4) { 
+        else if (wId === 4) {
             p.hasPowerShield = true; 
             p.powerShieldHits = 0; 
             p.powerShieldUnlockCount++; 
@@ -1733,6 +1842,21 @@ function updateWeaponMenuButtons() {
             menu.appendChild(btn);
         }
         
+        // Charged Shot upgrades
+        if (!p.hasChargedShot) {
+            let btn = document.createElement('button');
+            btn.className = 'weapon-btn';
+            btn.textContent = 'Charged Shot';
+            btn.onclick = () => selectWeapon(pIdx, 5);
+            menu.appendChild(btn);
+        } else if (!p.hasFastCharge) {
+            let btn = document.createElement('button');
+            btn.className = 'weapon-btn';
+            btn.textContent = 'Fast Charge (2s)';
+            btn.onclick = () => selectWeapon(pIdx, 51);
+            menu.appendChild(btn);
+        }
+
         // Power Shield upgrades
         if (!p.hasPowerShield) {
             let btn = document.createElement('button');
@@ -1766,7 +1890,16 @@ function updateWeaponMenuButtons() {
 
 function fireBlaster(p, owner) {
     let cooldown = p.hasDoubleSpeed ? BASE_BLASTER_CD / 2 : BASE_BLASTER_CD;
-    
+
+    if (isChargeReady(p)) {
+        // Charged shot: penetrating energy beam, 5x damage
+        pBullets.push({ x: p.x + p.w/2 - 6, y: p.y - 24, w: 12, h: 48, owner: owner, charged: true, hitList: [] });
+        sfx.shoot(1600);
+        p.chargeTimer = 0;
+        p.cd = cooldown;
+        return;
+    }
+
     if (p.hasSpreadBlaster) {
         // Spread Blaster x5: 5 shots over 60 degree arc
         let arcSpan = (60 * Math.PI) / 180; // 60 degrees in radians
@@ -1799,6 +1932,7 @@ function fireBlaster(p, owner) {
     
     sfx.shoot(800);
     p.cd = cooldown;
+    p.chargeTimer = 0; // Any shot resets the charge build-up
 }
 
 function launchRockets(p, count) {
@@ -1941,13 +2075,17 @@ function drawArrow(x, y, dir) { ctx.lineWidth = 4; ctx.strokeStyle = '#0f0'; ctx
 
 function drawMathChallenge() {
     if (!mathChallenge.active) return;
-    ctx.save(); ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.strokeStyle = "#00ffff"; ctx.lineWidth = 4;
+    ctx.save(); ctx.fillStyle = "#000"; ctx.strokeStyle = "#00ffff"; ctx.lineWidth = 4;
     let bx = WIDTH/2 - 250, by = HEIGHT/2 - 150; ctx.fillRect(bx, by, 500, 400); ctx.strokeRect(bx, by, 500, 400);
     ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "18px Courier New";
     let ty = by + 50; mathChallenge.customText.forEach(line => { ctx.fillText(line, WIDTH/2, ty); ty += 25; });
     
-    // Show challenge progress for multi-challenge
-    if (mathChallenge.multiChallenge > 1) {
+    // Show bonus banner, or challenge progress for multi-challenge
+    if (mathChallenge.isBonus) {
+        ctx.font = "bold 20px Courier New";
+        ctx.fillStyle = (animFrame % 20 < 10) ? "#ffff00" : "#ff00ff";
+        ctx.fillText("★ BONUS QUESTION ★", WIDTH/2, by + 120);
+    } else if (mathChallenge.multiChallenge > 1) {
         ctx.font = "16px Courier New";
         ctx.fillStyle = "#ff00ff";
         ctx.fillText(`Challenge ${mathChallenge.challengesCompleted + 1} of ${mathChallenge.multiChallenge}`, WIDTH/2, by + 120);
@@ -1955,7 +2093,7 @@ function drawMathChallenge() {
     
     ctx.font = "40px Courier New"; ctx.fillStyle = "#ffff00"; ctx.fillText(`${mathChallenge.num1} ${mathChallenge.operator || 'x'} ${mathChallenge.num2} = ?`, WIDTH/2, by + 160);
     ctx.font = "32px Courier New"; ctx.fillStyle = "#00ff00"; ctx.fillText(mathChallenge.answerStr + "_", WIDTH/2, by + 220);
-    if (mathChallenge.feedback) { ctx.fillStyle = (mathChallenge.feedback.includes("Uh oh") || mathChallenge.feedback.includes("Failed")) ? "#ff0000" : "#00ff00"; const lines = mathChallenge.feedback.split('\n'); let fby = by + 270; lines.forEach(line => { ctx.fillText(line, WIDTH/2, fby); fby += 30; }); }
+    if (mathChallenge.feedback) { ctx.fillStyle = (mathChallenge.feedback.includes("Uh oh") || mathChallenge.feedback.includes("Failed") || mathChallenge.feedback.includes("No bonus")) ? "#ff0000" : "#00ff00"; const lines = mathChallenge.feedback.split('\n'); let fby = by + 270; lines.forEach(line => { ctx.fillText(line, WIDTH/2, fby); fby += 30; }); }
     ctx.restore();
 }
 
@@ -2025,7 +2163,7 @@ function update(dt) {
         }
         while (eventTimeline.length > 0 && nextEventIndex < eventTimeline.length) {
             const ev = eventTimeline[nextEventIndex];
-            if (gameTime >= ev.time) { for(let k=0; k<ev.count; k++) createEnemy(ev.type); showToast(`EVENT: ${ev.count} ${ev.type.toUpperCase()}S!`); nextEventIndex++; } else { break; }
+            if (gameTime >= ev.time) { let evCount = difficulty === 'easy' ? Math.ceil(ev.count / 2) : ev.count; for(let k=0; k<evCount; k++) createEnemy(ev.type); showToast(`EVENT: ${evCount} ${ev.type.toUpperCase()}S!`); nextEventIndex++; } else { break; }
         }
     } else {
         if (enemies.length === 0) { const nextLvl = levelTimeline[nextLevelIndex]; enemyConfig = nextLvl.config; currentLevelName = nextLvl.name; levelMessage = currentLevelName; levelMessageTimer = 3000; document.getElementById('levelIndicator').innerText = currentLevelName; nextLevelIndex++; levelTransitionPending = false; }
@@ -2066,6 +2204,7 @@ function update(dt) {
         if (p.state === 'respawning') { p.respawnTimer -= dt; if(p.respawnTimer <= 0) { p.state = 'entering'; p.x = (i===0) ? WIDTH * 0.25 : WIDTH * 0.75; p.y = HEIGHT + 64; } return; }
         if (p.state === 'entering') { p.y -= 0.3 * dt; if (p.y <= p.startY) { p.y = p.startY; p.state = 'active'; p.shieldTimer = 3000; } return; }
         if (p.shieldTimer > 0) p.shieldTimer -= dt;
+        if (p.hasChargedShot) p.chargeTimer += dt;
         // Player 1 Controls
         if(i===0) {
             if (p1ControlType === 'keyboard') {
@@ -2376,14 +2515,21 @@ function update(dt) {
 
     for(let i=enemies.length-1; i>=0; i--) {
         let e = enemies[i];
-        if(e.type === 'charger') { e.y += 0.25 * e.speedMult * dt; } else if(e.type === 'fatty') { e.y += 0.04 * e.speedMult * dt; if(Math.random() < 0.01 * getEnemyFireRate()) { let target = null, minDist = 99999; players.forEach(p => { if(!p.dead && p.state === 'active') { let dist = Math.hypot(p.x - e.x, p.y - e.y); if(dist < minDist) { minDist = dist; target = p; } } }); let vx = 0, vy = 0.3 * dt; if(target) { let angle = Math.atan2(target.y - e.y, target.x - e.x); vx = Math.cos(angle)*0.3*dt; vy = Math.sin(angle)*0.3*dt; } eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, type: 'rocket', vx: vx, vy: vy}); sfx.enemyShoot(true); } } else if(e.type === 'shooter') { let targetY = SWARM.yBase + (e.gridRow * 40); let targetX = (WIDTH/2) + SWARM.xOffset + ((e.gridCol - SWARM.cols/2) * 40); if(e.state === 'entering') { e.y += 0.2 * e.speedMult * dt; e.x += (targetX - e.x) * 0.05; if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; } } else { e.y = targetY; e.x = targetX; if(Math.random() < 0.002 * getEnemyFireRate()) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: 0, vy: 0.4*dt}); sfx.enemyShoot(false); } } } else if (e.type === 'bugger') { if (e.state === 'moving') { e.angle += 0.003 * dt; e.centerY += 0.1 * e.speedMult * dt; e.x = e.centerX + Math.cos(e.angle) * 60; e.y = e.centerY + Math.sin(e.angle) * 30; e.rotation = lerpAngle(e.rotation, Math.atan2((e.centerY+0.1*e.speedMult*dt+Math.sin(e.angle+0.1)*30)-e.y, (e.centerX+Math.cos(e.angle+0.1)*60)-e.x)+Math.PI/2, 0.1*dt/16); if(Math.random() < 0.005 * getEnemyFireRate()) { e.state = 'aiming'; e.stopTimer = 500; } } else if (e.state === 'aiming') { e.stopTimer -= dt; let target = (!players[0].dead) ? players[0] : players[1]; if (!players[1].dead && Math.abs(players[1].x - e.x) < Math.abs(players[0].x - e.x)) target = players[1]; e.rotation = lerpAngle(e.rotation, Math.atan2(target.y - e.y, target.x - e.x) - Math.PI/2, 0.1 * dt/16); e.aimAngle = e.rotation; if (e.stopTimer <= 0) { e.state = 'bursting'; e.burstCount = 3; e.stopTimer = 0; } } else if (e.state === 'bursting') { e.stopTimer += dt; if (e.stopTimer > 100) { eBullets.push({ x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: Math.cos(e.aimAngle+Math.PI/2)*0.3*dt, vy: Math.sin(e.aimAngle+Math.PI/2)*0.3*dt }); sfx.enemyShoot(false); e.burstCount--; e.stopTimer = 0; if(e.burstCount <= 0) e.state = 'moving'; } } }
+        if(e.type === 'charger') { e.y += 0.25 * e.speedMult * dt; } else if(e.type === 'fatty') { e.y += 0.04 * e.speedMult * dt; if(Math.random() < 0.01 * getEnemyFireRate() && canEnemyFire(e)) { let target = null, minDist = 99999; players.forEach(p => { if(!p.dead && p.state === 'active') { let dist = Math.hypot(p.x - e.x, p.y - e.y); if(dist < minDist) { minDist = dist; target = p; } } }); let vx = 0, vy = 0.3 * dt; if(target) { let angle = Math.atan2(target.y - e.y, target.x - e.x); vx = Math.cos(angle)*0.3*dt; vy = Math.sin(angle)*0.3*dt; } eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, type: 'rocket', vx: vx, vy: vy}); sfx.enemyShoot(true); } } else if(e.type === 'shooter') { let targetY = SWARM.yBase + (e.gridRow * 40); let targetX = (WIDTH/2) + SWARM.xOffset + ((e.gridCol - SWARM.cols/2) * 40); if(e.state === 'entering') { e.y += 0.2 * e.speedMult * dt; e.x += (targetX - e.x) * 0.05; if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; } } else { e.y = targetY; e.x = targetX; if(Math.random() < 0.002 * getEnemyFireRate() && canEnemyFire(e)) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: 0, vy: 0.4*dt}); sfx.enemyShoot(false); } } } else if (e.type === 'bugger') { if (e.state === 'moving') { e.angle += 0.003 * dt; e.centerY += 0.1 * e.speedMult * dt; e.x = e.centerX + Math.cos(e.angle) * 60; e.y = e.centerY + Math.sin(e.angle) * 30; e.rotation = lerpAngle(e.rotation, Math.atan2((e.centerY+0.1*e.speedMult*dt+Math.sin(e.angle+0.1)*30)-e.y, (e.centerX+Math.cos(e.angle+0.1)*60)-e.x)+Math.PI/2, 0.1*dt/16); if(Math.random() < 0.005 * getEnemyFireRate() && canEnemyFire(e)) { e.state = 'aiming'; e.stopTimer = 500; } } else if (e.state === 'aiming') { e.stopTimer -= dt; let target = (!players[0].dead) ? players[0] : players[1]; if (!players[1].dead && Math.abs(players[1].x - e.x) < Math.abs(players[0].x - e.x)) target = players[1]; e.rotation = lerpAngle(e.rotation, Math.atan2(target.y - e.y, target.x - e.x) - Math.PI/2, 0.1 * dt/16); e.aimAngle = e.rotation; if (e.stopTimer <= 0) { e.state = 'bursting'; e.burstCount = 3; e.stopTimer = 0; } } else if (e.state === 'bursting') { e.stopTimer += dt; if (e.stopTimer > 100) { if (canEnemyFire(e)) { eBullets.push({ x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: Math.cos(e.aimAngle+Math.PI/2)*0.3*dt, vy: Math.sin(e.aimAngle+Math.PI/2)*0.3*dt }); sfx.enemyShoot(false); } e.burstCount--; e.stopTimer = 0; if(e.burstCount <= 0) e.state = 'moving'; } } }
         if(e.flashTimer > 0) e.flashTimer--;
         let destroyed = false;
         for(let bIdx=pBullets.length-1; bIdx>=0; bIdx--) {
             let b = pBullets[bIdx];
             if(rectIntersect(e, b)) {
-                e.hp--;
-                pBullets.splice(bIdx, 1);
+                if (b.charged) {
+                    // Charged shot: 5x damage, penetrates (only damages each enemy once)
+                    if (b.hitList.includes(e)) continue;
+                    b.hitList.push(e);
+                    e.hp -= CHARGED_SHOT_DAMAGE;
+                } else {
+                    e.hp--;
+                    pBullets.splice(bIdx, 1);
+                }
                 if(e.hp > 0) {
                     e.flashTimer = 5;
                 } else {
@@ -2433,15 +2579,23 @@ function update(dt) {
         for(let pIdx=0; pIdx<players.length; pIdx++) {
             let p = players[pIdx];
             if(!p.dead && p.state === 'active' && rectIntersect(p, c)) {
-                if (c.type === 'energy') { 
-                    // Fill bar to powerUpValve amount (no randomization)
-                    if(pIdx === 0) p1Power += powerUpValve; 
-                    else p2Power += powerUpValve; 
-                    if(p1Power > 100) p1Power = 100; 
-                    if(p2Power > 100) p2Power = 100; 
-                    showFloatingText(pIdx, powerUpValve + '%'); 
-                    sfx.explosion('capsule'); 
-                } else if (c.type === 'nuke') { 
+                if (c.type === 'energy') {
+                    if (difficulty !== 'hard' && !p.hasCollectedFirstPowerUp) {
+                        // On easy/normal the first power up collected gives full power
+                        p.hasCollectedFirstPowerUp = true;
+                        if(pIdx === 0) p1Power = 100; else p2Power = 100;
+                        showFloatingText(pIdx, "FULL POWER!");
+                    } else {
+                        p.hasCollectedFirstPowerUp = true;
+                        // Fill bar to powerUpValve amount (no randomization)
+                        if(pIdx === 0) p1Power += powerUpValve;
+                        else p2Power += powerUpValve;
+                        if(p1Power > 100) p1Power = 100;
+                        if(p2Power > 100) p2Power = 100;
+                        showFloatingText(pIdx, powerUpValve + '%');
+                    }
+                    sfx.explosion('capsule');
+                } else if (c.type === 'nuke') {
                     let maxNukes = players[pIdx].maxNukes || 1;
                     if (players[pIdx].nukes < maxNukes) { 
                         players[pIdx].nukes++; 
@@ -2502,7 +2656,7 @@ function draw() {
     if(gameOver) { ctx.fillStyle = "red"; ctx.font = "50px Courier New"; ctx.textAlign = "center"; ctx.fillText("GAME OVER", WIDTH/2, HEIGHT/2); return; }
     particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1.0; });
     capsules.forEach(c => { ctx.drawImage((c.type==='nuke'?assets.nuke_pickup:(assets.powerup||assets.capsule)), c.x, c.y, c.w, c.h); });
-    players.forEach((p, i) => { if(!p.dead && p.state !== 'respawning') { if(p.shieldTimer > 0) { ctx.save(); ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 3; ctx.shadowBlur = 10; ctx.shadowColor = '#00ffff'; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, 40, 0, Math.PI*2); ctx.stroke(); ctx.restore(); } ctx.drawImage(assets['p'+(i+1)], p.x, p.y, p.w, p.h); if(p.hasPowerShield) { ctx.save(); let shieldColor = p.powerShieldHits === 0 ? '#00ffff' : '#ffff00'; let shieldImg = (p.powerShieldHits > 0 && assets.shield_hit) ? assets.shield_hit : assets.shield; if(shieldImg) { ctx.globalAlpha = 0.8; ctx.drawImage(shieldImg, p.x - 8, p.y - 8, p.w + 16, p.h + 16); } else { ctx.strokeStyle = shieldColor; ctx.lineWidth = 4; ctx.shadowBlur = 15; ctx.shadowColor = shieldColor; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, 44, 0, Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, 38, 0, Math.PI*2); ctx.stroke(); } ctx.restore(); } } });
+    players.forEach((p, i) => { if(!p.dead && p.state !== 'respawning') { if(p.shieldTimer > 0) { ctx.save(); ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 3; ctx.shadowBlur = 10; ctx.shadowColor = '#00ffff'; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, 40, 0, Math.PI*2); ctx.stroke(); ctx.restore(); } ctx.drawImage(assets['p'+(i+1)], p.x, p.y, p.w, p.h); if(isChargeReady(p)) { ctx.save(); ctx.globalAlpha = 0.25 + 0.45 * Math.abs(Math.sin(animFrame * 0.15)); ctx.shadowBlur = 20; ctx.shadowColor = '#00aaff'; ctx.drawImage(getChargeTintedSprite(assets['p'+(i+1)]), p.x, p.y, p.w, p.h); ctx.restore(); } if(p.hasPowerShield) { ctx.save(); let shieldColor = p.powerShieldHits === 0 ? '#00ffff' : '#ffff00'; let shieldImg = (p.powerShieldHits > 0 && assets.shield_hit) ? assets.shield_hit : assets.shield; if(shieldImg) { ctx.globalAlpha = 0.8; ctx.drawImage(shieldImg, p.x - 8, p.y - 8, p.w + 16, p.h + 16); } else { ctx.strokeStyle = shieldColor; ctx.lineWidth = 4; ctx.shadowBlur = 15; ctx.shadowColor = shieldColor; ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, 44, 0, Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(p.x + p.w/2, p.y + p.h/2, 38, 0, Math.PI*2); ctx.stroke(); } ctx.restore(); } } });
     rockets.forEach(r => { 
         ctx.save();
         ctx.translate(r.x + r.w/2, r.y + r.h/2);
@@ -2584,7 +2738,20 @@ function draw() {
         ctx.restore();
     });
     enemies.forEach(e => { if (e.type === 'bugger') { ctx.save(); ctx.translate(e.x + e.w/2, e.y + e.h/2); ctx.rotate(e.rotation); if(e.emoji) { ctx.font = "28px Arial"; ctx.textAlign="center"; ctx.fillText(e.emoji, 0, 10); } else { ctx.drawImage(assets[e.type], -e.w/2, -e.h/2, e.w, e.h); } ctx.restore(); } else { if(e.flashTimer > 0) { ctx.save(); ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = "white"; ctx.fillRect(e.x, e.y, e.w, e.h); ctx.restore(); } else { if(e.emoji) { ctx.font = (e.type==='fatty'?"50px":"28px")+" Arial"; ctx.textAlign="center"; ctx.fillText(e.emoji, e.x+e.w/2, e.y+e.h/1.2); } else { ctx.drawImage(assets[e.type], e.x, e.y, e.w, e.h); } } } });
-    ctx.fillStyle = "#ff0"; pBullets.forEach(b => ctx.drawImage(assets.bullet, b.x, b.y, b.w, b.h));
+    pBullets.forEach(b => {
+        if (b.charged) {
+            // Charged shot: glowing energy laser beam
+            ctx.save();
+            ctx.shadowBlur = 15; ctx.shadowColor = '#00aaff';
+            ctx.fillStyle = '#33bbff';
+            ctx.fillRect(b.x, b.y, b.w, b.h);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(b.x + b.w/2 - 2, b.y, 4, b.h);
+            ctx.restore();
+        } else {
+            ctx.drawImage(assets.bullet, b.x, b.y, b.w, b.h);
+        }
+    });
     eBullets.forEach(b => { if(b.type === 'rocket') { ctx.fillStyle = '#ccc'; ctx.beginPath(); ctx.moveTo(b.x + b.w/2, b.y); ctx.lineTo(b.x + b.w, b.y + b.h); ctx.lineTo(b.x, b.y + b.h); ctx.fill(); } else { ctx.fillStyle = (animFrame % 4 < 2) ? '#ff0000' : '#ff7700'; ctx.fillRect(b.x, b.y, b.w, b.h); } });
     if(showTimer) { ctx.save(); ctx.fillStyle = "#ff0"; ctx.font = "24px Courier New"; ctx.textAlign = "left"; ctx.fillText(formatTimer(gameTime), 10, 30); ctx.restore(); }
     if(levelMessageTimer > 0) { 
@@ -2619,8 +2786,8 @@ function draw() {
     if(continueChallenge.active) { drawContinueChallenge(); } else if(mathChallenge.active) { drawMathChallenge(); } else if(gamePaused || selectionPaused || postChallengePaused) { ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(0,0,WIDTH,HEIGHT); ctx.fillStyle = "#fff"; ctx.font = "40px Courier New"; ctx.textAlign = "center"; if (selectionPaused) { ctx.fillStyle = "#00ffff"; ctx.fillText("WEAPON SELECTION", WIDTH/2, HEIGHT/2); } else { ctx.fillText("PAUSED", WIDTH/2, HEIGHT/2); } ctx.restore(); }
     
     // Update HUD with labels intact
-    document.getElementById('p1Stats').innerHTML = `Reactor Power: ${Math.floor(p1Power)}%<br>Lives: ${players[0].lives}`; 
-    document.getElementById('p2Stats').innerHTML = `Reactor Power: ${Math.floor(p2Power)}%<br>Lives: ${players[1].lives}`;
+    document.getElementById('p1Stats').innerHTML = `Reactor Power: ${Math.floor(p1Power)}% | Lives: ${players[0].lives}`; 
+    document.getElementById('p2Stats').innerHTML = `Reactor Power: ${Math.floor(p2Power)}% | Lives: ${players[1].lives}`;
     document.getElementById('gameTitle').textContent = 'MATH NUKE';
 }
 
@@ -2639,6 +2806,7 @@ window.addEventListener('keydown', e => {
         else if (e.key === '`' || e.code === 'Backquote') { continueChallenge.answerStr = continueChallenge.correctAnswer.toString(); }
         else if (e.key === 'Enter') {
             if (parseInt(continueChallenge.answerStr) === continueChallenge.correctAnswer) {
+                sfx.correct();
                 resolveContinueChallenge(true);
             } else {
                 // Wrong answer: new problem, timer keeps running
@@ -2657,11 +2825,22 @@ window.addEventListener('keydown', e => {
         if (e.key >= '0' && e.key <= '9') { mathChallenge.answerStr += e.key; }
         else if (e.key === 'Backspace') { mathChallenge.answerStr = mathChallenge.answerStr.slice(0, -1); } 
         else if (e.key === '`' || e.code === 'Backquote') { mathChallenge.answerStr = mathChallenge.correctAnswer.toString(); } 
-        else if (e.key === 'Enter') { 
-            let val = parseInt(mathChallenge.answerStr); 
-            if (val === mathChallenge.correctAnswer) { 
+        else if (e.key === 'Enter') {
+            let val = parseInt(mathChallenge.answerStr);
+            if (val === mathChallenge.correctAnswer) {
+                sfx.correct();
+                if (mathChallenge.isBonus) {
+                    // Bonus answered correctly: upgrade + full power
+                    mathChallenge.feedback = "BONUS WIN!\nFULL POWER!";
+                    let bonusPIdx = mathChallenge.pIdx;
+                    setTimeout(() => {
+                        finalizeUpgrade(true);
+                        if (bonusPIdx === 0) p1Power = 100; else p2Power = 100;
+                        checkPowerLevels();
+                    }, 800);
+                }
                 // Check if this is a multi-challenge (Reload Nukes)
-                if (mathChallenge.multiChallenge > 1) {
+                else if (mathChallenge.multiChallenge > 1) {
                     mathChallenge.challengesCompleted++;
                     if (mathChallenge.challengesCompleted < mathChallenge.multiChallenge) {
                         // More challenges needed
@@ -2673,20 +2852,24 @@ window.addEventListener('keydown', e => {
                         mathChallenge.num2 = problem.num2;
                         mathChallenge.operator = problem.operator;
                         mathChallenge.correctAnswer = problem.correctAnswer;
-                    } else {
+                    } else if (!maybeStartBonusQuestion()) {
                         // All challenges completed!
                         mathChallenge.feedback = "PERFECT!\nAll codes accepted!";
                         setTimeout(() => finalizeUpgrade(true), 500);
                     }
-                } else {
-                    mathChallenge.feedback = "Freakin' Sweet!\nThat's Correct!"; 
-                    setTimeout(() => finalizeUpgrade(true), 500); 
+                } else if (!maybeStartBonusQuestion()) {
+                    mathChallenge.feedback = "Freakin' Sweet!\nThat's Correct!";
+                    setTimeout(() => finalizeUpgrade(true), 500);
                 }
-            } else { 
-                mathChallenge.feedback = "Uh oh! That wasn't right."; 
-                setTimeout(() => finalizeUpgrade(false), 800); 
-            } 
-        } 
+            } else if (mathChallenge.isBonus) {
+                // Wrong bonus answer: no penalty, the earned upgrade still installs
+                mathChallenge.feedback = "No bonus this time!";
+                setTimeout(() => finalizeUpgrade(true), 800);
+            } else {
+                mathChallenge.feedback = "Uh oh! That wasn't right.";
+                setTimeout(() => finalizeUpgrade(false), 800);
+            }
+        }
         return; 
     }
     if(e.key === 'o' || e.code === 'KeyO') { p1Power = 100; } 
