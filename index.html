@@ -558,6 +558,11 @@ function getEnemyFireRate() {
     return difficulty === 'easy' ? 0.5 : 1;
 }
 
+// On easy, enemy projectiles move 25% slower
+function getEnemyProjectileSpeed() {
+    return difficulty === 'easy' ? 0.75 : 1;
+}
+
 // Enemies never fire from the bottom 5% of the screen
 function canEnemyFire(e) {
     return (e.y + e.h) < HEIGHT * 0.95;
@@ -798,6 +803,10 @@ let nextEventIndex = 0;
 // ECONOMY & UI STATE
 let p1Power = 0;
 let p2Power = 0;
+// Tracks whether a player's current bar power was awarded by a bonus question.
+// Bonus questions only trigger on power charged up from 0% by capsules, so a
+// bonus win can never lead to another bonus question.
+let powerIsFromBonus = [false, false];
 let p1Selecting = false;
 let p2Selecting = false;
 let highPower = parseInt(localStorage.getItem('galago_high_power')) || 0;
@@ -904,12 +913,15 @@ const assets = {
 const BASE_BLASTER_CD = 400; // Base cooldown (half of original 200)
 const PLAYER_START_Y = HEIGHT - 70;
 
-// Charged Shot: hold fire to charge a penetrating 5x-damage beam
-const CHARGE_TIME_NORMAL = 3000;
-const CHARGE_TIME_FAST = 2000;
+// Charged Shot: hold fire to charge a penetrating 5x-damage beam.
+// Level 1: single beam, 2s charge. Level 2: 2 beams per charge.
+// Level 3: 3 beams per charge and a faster 1.5s charge.
+const CHARGE_TIME_NORMAL = 2000;
+const CHARGE_TIME_FAST = 1500;
 const CHARGED_SHOT_DAMAGE = 5;
+const CHARGED_BURST_DELAY = 250; // delay between charged shots in a burst
 function isChargeReady(p) {
-    return p.hasChargedShot && p.chargeTimer >= (p.hasFastCharge ? CHARGE_TIME_FAST : CHARGE_TIME_NORMAL);
+    return p.chargedShotLevel > 0 && p.chargeTimer >= (p.chargedShotLevel >= 3 ? CHARGE_TIME_FAST : CHARGE_TIME_NORMAL);
 }
 
 // Cached blue-tinted copies of the ship sprites for the charge-ready flash
@@ -931,8 +943,8 @@ function getChargeTintedSprite(img) {
 
 function initPlayers() {
     return [
-        { x: WIDTH * 0.25, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, hasChargedShot: false, hasFastCharge: false, chargeTimer: 0, hasCollectedFirstPowerUp: false },
-        { x: WIDTH * 0.75, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, hasChargedShot: false, hasFastCharge: false, chargeTimer: 0, hasCollectedFirstPowerUp: false }
+        { x: WIDTH * 0.25, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, chargedBurstShots: 0, chargedBurstTimer: 0, hasCollectedFirstPowerUp: false },
+        { x: WIDTH * 0.75, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, chargedBurstShots: 0, chargedBurstTimer: 0, hasCollectedFirstPowerUp: false }
     ];
 }
 const players = initPlayers();
@@ -1303,7 +1315,7 @@ function destroyRandomWeapon(p, pIdx) {
         let shieldName = p.shatterShieldLevel > 0 ? "Shatter Shield x5" : "Power Shield";
         weapons.push({ name: shieldName, destroy: () => { p.hasPowerShield = false; p.powerShieldHits = 0; p.shatterShieldLevel = 0; } });
     }
-    if (p.hasChargedShot) weapons.push({ name: "Charged Shot", destroy: () => { p.hasChargedShot = false; p.hasFastCharge = false; p.chargeTimer = 0; } });
+    if (p.chargedShotLevel > 0) weapons.push({ name: "Charged Shot", destroy: () => { p.chargedShotLevel = 0; p.chargeTimer = 0; p.chargedBurstShots = 0; } });
 
     if (weapons.length > 0) {
         let chosen = weapons[Math.floor(Math.random() * weapons.length)];
@@ -1329,8 +1341,9 @@ function countUpgrades(p) {
     if (p.hasClusterNukes) count++;
     if (p.hasPowerShield) count++;
     if (p.shatterShieldLevel > 0) count++;
-    if (p.hasChargedShot) count++;
-    if (p.hasFastCharge) count++;
+    if (p.chargedShotLevel >= 1) count++;
+    if (p.chargedShotLevel >= 2) count++;
+    if (p.chargedShotLevel >= 3) count++;
     return count;
 }
 
@@ -1364,7 +1377,7 @@ function getShipsPerMinBoost() {
 
 // Calculate power up drop rate multiplier based on upgrades
 // Goes from 1.0 (0 upgrades) to 0.05 (all upgrades)
-const MAX_UPGRADES = 15; // Total possible upgrades
+const MAX_UPGRADES = 16; // Total possible upgrades
 function getDropRateMultiplier() {
     // Get the max upgrades across all players
     let maxUpgrades = 0;
@@ -1589,7 +1602,7 @@ window.selectWeapon = function(playerIndex, weaponId) {
     else if (weaponId === 4) {
         textLines = ["Shield generator calibration required...", "Enter the frequency harmonics."];
     }
-    else if (weaponId === 5 || weaponId === 51) {
+    else if (weaponId === 5 || weaponId === 51 || weaponId === 52) {
         textLines = ["Charge capacitors require precise", "energy calculations."];
     }
     else if (weaponId === 11) { 
@@ -1628,6 +1641,10 @@ window.selectWeapon = function(playerIndex, weaponId) {
 // answering it correctly awards full power. Returns true if a bonus started.
 function maybeStartBonusQuestion() {
     if (difficulty === 'hard') return false;
+    // Bonus questions never trigger from other bonus questions
+    if (mathChallenge.isBonus) return false;
+    // Only power earned from an empty bar qualifies for a bonus
+    if (powerIsFromBonus[mathChallenge.pIdx]) return false;
     if (Math.random() >= getBonusQuestionChance(players[mathChallenge.pIdx])) return false;
     sfx.bonus();
     mathChallenge.isBonus = true;
@@ -1681,9 +1698,10 @@ function finalizeUpgrade(success) {
             weaponName = "Cluster Nukes";
         }
         
-        // Charged Shot: 5=unlock, 51=faster charge (2s)
-        else if (wId === 5) { p.hasChargedShot = true; p.chargeTimer = 0; weaponName = "Charged Shot"; }
-        else if (wId === 51) { p.hasFastCharge = true; weaponName = "Fast Charge"; }
+        // Charged Shot: 5=unlock, 51=double shot, 52=triple shot + 1.5s charge
+        else if (wId === 5) { p.chargedShotLevel = 1; p.chargeTimer = 0; weaponName = "Charged Shot"; }
+        else if (wId === 51) { p.chargedShotLevel = 2; weaponName = "Double Charged Shot"; }
+        else if (wId === 52) { p.chargedShotLevel = 3; weaponName = "Triple Charged Shot"; }
 
         // Power Shield
         else if (wId === 4) {
@@ -1713,6 +1731,7 @@ function finalizeUpgrade(success) {
         showToast((pIdx===0?"P1":"P2") + " Equipped " + weaponName);
         if(pIdx === 0) { p1Power = 0; p1Selecting = false; document.getElementById('p1-bar-container').classList.remove('static-active'); }
         else { p2Power = 0; p2Selecting = false; document.getElementById('p2-bar-container').classList.remove('static-active'); }
+        powerIsFromBonus[pIdx] = false; // Power spent; the next bar starts from 0%
         updateWeaponMenuButtons();
     } else {
         let penalty = Math.floor(Math.random() * 11) + 25; 
@@ -1843,17 +1862,23 @@ function updateWeaponMenuButtons() {
         }
         
         // Charged Shot upgrades
-        if (!p.hasChargedShot) {
+        if (p.chargedShotLevel === 0) {
             let btn = document.createElement('button');
             btn.className = 'weapon-btn';
             btn.textContent = 'Charged Shot';
             btn.onclick = () => selectWeapon(pIdx, 5);
             menu.appendChild(btn);
-        } else if (!p.hasFastCharge) {
+        } else if (p.chargedShotLevel === 1) {
             let btn = document.createElement('button');
             btn.className = 'weapon-btn';
-            btn.textContent = 'Fast Charge (2s)';
+            btn.textContent = 'Double Charged Shot';
             btn.onclick = () => selectWeapon(pIdx, 51);
+            menu.appendChild(btn);
+        } else if (p.chargedShotLevel === 2) {
+            let btn = document.createElement('button');
+            btn.className = 'weapon-btn';
+            btn.textContent = 'Triple Charge (1.5s)';
+            btn.onclick = () => selectWeapon(pIdx, 52);
             menu.appendChild(btn);
         }
 
@@ -1888,13 +1913,20 @@ function updateWeaponMenuButtons() {
     }
 }
 
+function fireChargedBeam(p, owner) {
+    // Penetrating energy beam, 5x damage
+    pBullets.push({ x: p.x + p.w/2 - 6, y: p.y - 24, w: 12, h: 48, owner: owner, charged: true, hitList: [] });
+    sfx.shoot(1600);
+}
+
 function fireBlaster(p, owner) {
     let cooldown = p.hasDoubleSpeed ? BASE_BLASTER_CD / 2 : BASE_BLASTER_CD;
 
     if (isChargeReady(p)) {
-        // Charged shot: penetrating energy beam, 5x damage
-        pBullets.push({ x: p.x + p.w/2 - 6, y: p.y - 24, w: 12, h: 48, owner: owner, charged: true, hitList: [] });
-        sfx.shoot(1600);
+        fireChargedBeam(p, owner);
+        // Levels 2/3 fire extra beams in a row, 1/4s apart
+        p.chargedBurstShots = p.chargedShotLevel - 1;
+        p.chargedBurstTimer = CHARGED_BURST_DELAY;
         p.chargeTimer = 0;
         p.cd = cooldown;
         return;
@@ -1935,13 +1967,15 @@ function fireBlaster(p, owner) {
     p.chargeTimer = 0; // Any shot resets the charge build-up
 }
 
+const ROCKET_SPEED_BOOST = 1.3; // Player rockets always move 30% faster
+
 function launchRockets(p, count) {
     const cx = p.x + p.w/2 - 8; const cy = p.y + 10;
-    for(let i=0; i<count; i++) { 
-        let dir = (i % 2 === 0) ? -1 : 1; 
+    for(let i=0; i<count; i++) {
+        let dir = (i % 2 === 0) ? -1 : 1;
         let spread = Math.floor(i / 2) * 0.05; // Spread them out more
-        let vx = dir * (0.1 + spread + Math.random() * 0.1); 
-        rockets.push({ x: cx, y: cy, w: 16, h: 32, vx: vx, vy: 0, phase: 'deploy', timer: 0 }); 
+        let vx = dir * (0.1 + spread + Math.random() * 0.1) * ROCKET_SPEED_BOOST;
+        rockets.push({ x: cx, y: cy, w: 16, h: 32, vx: vx, vy: 0, phase: 'deploy', timer: 0 });
     }
     sfx.rocketLaunch();
 }
@@ -2204,7 +2238,17 @@ function update(dt) {
         if (p.state === 'respawning') { p.respawnTimer -= dt; if(p.respawnTimer <= 0) { p.state = 'entering'; p.x = (i===0) ? WIDTH * 0.25 : WIDTH * 0.75; p.y = HEIGHT + 64; } return; }
         if (p.state === 'entering') { p.y -= 0.3 * dt; if (p.y <= p.startY) { p.y = p.startY; p.state = 'active'; p.shieldTimer = 3000; } return; }
         if (p.shieldTimer > 0) p.shieldTimer -= dt;
-        if (p.hasChargedShot) p.chargeTimer += dt;
+        if (p.chargedShotLevel > 0) p.chargeTimer += dt;
+        // Fire queued charged burst shots (1/4s apart)
+        if (p.chargedBurstShots > 0) {
+            p.chargedBurstTimer -= dt;
+            if (p.chargedBurstTimer <= 0) {
+                fireChargedBeam(p, i);
+                p.chargedBurstShots--;
+                p.chargedBurstTimer = CHARGED_BURST_DELAY;
+                p.chargeTimer = 0;
+            }
+        }
         // Player 1 Controls
         if(i===0) {
             if (p1ControlType === 'keyboard') {
@@ -2299,14 +2343,14 @@ function update(dt) {
                 let dx = (r.target.x + r.target.w/2) - (r.x + r.w/2);
                 let dy = (r.target.y + r.target.h/2) - (r.y + r.h/2);
                 let angle = Math.atan2(dy, dx);
-                let speed = 0.2; 
+                let speed = 0.2 * ROCKET_SPEED_BOOST;
                 r.vx = Math.cos(angle) * speed;
                 r.vy = Math.sin(angle) * speed;
             } else {
                 if (enemies.length > 0) {
                     r.target = enemies[Math.floor(Math.random() * enemies.length)];
                 } else {
-                    r.vy = -0.15; 
+                    r.vy = -0.15 * ROCKET_SPEED_BOOST;
                     r.vx *= 0.95;
                 }
             }
@@ -2515,7 +2559,7 @@ function update(dt) {
 
     for(let i=enemies.length-1; i>=0; i--) {
         let e = enemies[i];
-        if(e.type === 'charger') { e.y += 0.25 * e.speedMult * dt; } else if(e.type === 'fatty') { e.y += 0.04 * e.speedMult * dt; if(Math.random() < 0.01 * getEnemyFireRate() && canEnemyFire(e)) { let target = null, minDist = 99999; players.forEach(p => { if(!p.dead && p.state === 'active') { let dist = Math.hypot(p.x - e.x, p.y - e.y); if(dist < minDist) { minDist = dist; target = p; } } }); let vx = 0, vy = 0.3 * dt; if(target) { let angle = Math.atan2(target.y - e.y, target.x - e.x); vx = Math.cos(angle)*0.3*dt; vy = Math.sin(angle)*0.3*dt; } eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, type: 'rocket', vx: vx, vy: vy}); sfx.enemyShoot(true); } } else if(e.type === 'shooter') { let targetY = SWARM.yBase + (e.gridRow * 40); let targetX = (WIDTH/2) + SWARM.xOffset + ((e.gridCol - SWARM.cols/2) * 40); if(e.state === 'entering') { e.y += 0.2 * e.speedMult * dt; e.x += (targetX - e.x) * 0.05; if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; } } else { e.y = targetY; e.x = targetX; if(Math.random() < 0.002 * getEnemyFireRate() && canEnemyFire(e)) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: 0, vy: 0.4*dt}); sfx.enemyShoot(false); } } } else if (e.type === 'bugger') { if (e.state === 'moving') { e.angle += 0.003 * dt; e.centerY += 0.1 * e.speedMult * dt; e.x = e.centerX + Math.cos(e.angle) * 60; e.y = e.centerY + Math.sin(e.angle) * 30; e.rotation = lerpAngle(e.rotation, Math.atan2((e.centerY+0.1*e.speedMult*dt+Math.sin(e.angle+0.1)*30)-e.y, (e.centerX+Math.cos(e.angle+0.1)*60)-e.x)+Math.PI/2, 0.1*dt/16); if(Math.random() < 0.005 * getEnemyFireRate() && canEnemyFire(e)) { e.state = 'aiming'; e.stopTimer = 500; } } else if (e.state === 'aiming') { e.stopTimer -= dt; let target = (!players[0].dead) ? players[0] : players[1]; if (!players[1].dead && Math.abs(players[1].x - e.x) < Math.abs(players[0].x - e.x)) target = players[1]; e.rotation = lerpAngle(e.rotation, Math.atan2(target.y - e.y, target.x - e.x) - Math.PI/2, 0.1 * dt/16); e.aimAngle = e.rotation; if (e.stopTimer <= 0) { e.state = 'bursting'; e.burstCount = 3; e.stopTimer = 0; } } else if (e.state === 'bursting') { e.stopTimer += dt; if (e.stopTimer > 100) { if (canEnemyFire(e)) { eBullets.push({ x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: Math.cos(e.aimAngle+Math.PI/2)*0.3*dt, vy: Math.sin(e.aimAngle+Math.PI/2)*0.3*dt }); sfx.enemyShoot(false); } e.burstCount--; e.stopTimer = 0; if(e.burstCount <= 0) e.state = 'moving'; } } }
+        if(e.type === 'charger') { e.y += 0.25 * e.speedMult * dt; } else if(e.type === 'fatty') { e.y += 0.04 * e.speedMult * dt; if(Math.random() < 0.01 * getEnemyFireRate() && canEnemyFire(e)) { let target = null, minDist = 99999; players.forEach(p => { if(!p.dead && p.state === 'active') { let dist = Math.hypot(p.x - e.x, p.y - e.y); if(dist < minDist) { minDist = dist; target = p; } } }); let projSpd = 0.3 * getEnemyProjectileSpeed(); let vx = 0, vy = projSpd * dt; if(target) { let angle = Math.atan2(target.y - e.y, target.x - e.x); vx = Math.cos(angle)*projSpd*dt; vy = Math.sin(angle)*projSpd*dt; } eBullets.push({x: e.x + e.w/2 - 8, y: e.y + e.h, w:24, h:24, type: 'rocket', vx: vx, vy: vy}); sfx.enemyShoot(true); } } else if(e.type === 'shooter') { let targetY = SWARM.yBase + (e.gridRow * 40); let targetX = (WIDTH/2) + SWARM.xOffset + ((e.gridCol - SWARM.cols/2) * 40); if(e.state === 'entering') { e.y += 0.2 * e.speedMult * dt; e.x += (targetX - e.x) * 0.05; if(e.y >= targetY) { e.y = targetY; e.state = 'docked'; } } else { e.y = targetY; e.x = targetX; if(Math.random() < 0.002 * getEnemyFireRate() && canEnemyFire(e)) { eBullets.push({x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: 0, vy: 0.4*getEnemyProjectileSpeed()*dt}); sfx.enemyShoot(false); } } } else if (e.type === 'bugger') { if (e.state === 'moving') { e.angle += 0.003 * dt; e.centerY += 0.1 * e.speedMult * dt; e.x = e.centerX + Math.cos(e.angle) * 60; e.y = e.centerY + Math.sin(e.angle) * 30; e.rotation = lerpAngle(e.rotation, Math.atan2((e.centerY+0.1*e.speedMult*dt+Math.sin(e.angle+0.1)*30)-e.y, (e.centerX+Math.cos(e.angle+0.1)*60)-e.x)+Math.PI/2, 0.1*dt/16); if(Math.random() < 0.005 * getEnemyFireRate() && canEnemyFire(e)) { e.state = 'aiming'; e.stopTimer = 500; } } else if (e.state === 'aiming') { e.stopTimer -= dt; let target = (!players[0].dead) ? players[0] : players[1]; if (!players[1].dead && Math.abs(players[1].x - e.x) < Math.abs(players[0].x - e.x)) target = players[1]; e.rotation = lerpAngle(e.rotation, Math.atan2(target.y - e.y, target.x - e.x) - Math.PI/2, 0.1 * dt/16); e.aimAngle = e.rotation; if (e.stopTimer <= 0) { e.state = 'bursting'; e.burstCount = 3; e.stopTimer = 0; } } else if (e.state === 'bursting') { e.stopTimer += dt; if (e.stopTimer > 100) { if (canEnemyFire(e)) { eBullets.push({ x: e.x + e.w/2, y: e.y + e.h, w:8, h:16, type: 'laser', vx: Math.cos(e.aimAngle+Math.PI/2)*0.3*getEnemyProjectileSpeed()*dt, vy: Math.sin(e.aimAngle+Math.PI/2)*0.3*getEnemyProjectileSpeed()*dt }); sfx.enemyShoot(false); } e.burstCount--; e.stopTimer = 0; if(e.burstCount <= 0) e.state = 'moving'; } } }
         if(e.flashTimer > 0) e.flashTimer--;
         let destroyed = false;
         for(let bIdx=pBullets.length-1; bIdx>=0; bIdx--) {
@@ -2580,6 +2624,7 @@ function update(dt) {
             let p = players[pIdx];
             if(!p.dead && p.state === 'active' && rectIntersect(p, c)) {
                 if (c.type === 'energy') {
+                    powerIsFromBonus[pIdx] = false; // Capsule power counts as earned from 0%
                     if (difficulty !== 'hard' && !p.hasCollectedFirstPowerUp) {
                         // On easy/normal the first power up collected gives full power
                         p.hasCollectedFirstPowerUp = true;
@@ -2836,6 +2881,7 @@ window.addEventListener('keydown', e => {
                     setTimeout(() => {
                         finalizeUpgrade(true);
                         if (bonusPIdx === 0) p1Power = 100; else p2Power = 100;
+                        powerIsFromBonus[bonusPIdx] = true;
                         checkPowerLevels();
                     }, 800);
                 }
@@ -2872,9 +2918,9 @@ window.addEventListener('keydown', e => {
         }
         return; 
     }
-    if(e.key === 'o' || e.code === 'KeyO') { p1Power = 100; } 
+    if(e.key === 'o' || e.code === 'KeyO') { p1Power = 100; powerIsFromBonus[0] = false; }
     // Changed W key behavior - only fill P2 power if P2 is using keyboard for shooting (not using W for movement)
-    if((e.key === 'w' || e.code === 'KeyW') && (numPlayers === 1 || p2ControlType !== 'keyboard')) { p2Power = 100; }
+    if((e.key === 'w' || e.code === 'KeyW') && (numPlayers === 1 || p2ControlType !== 'keyboard')) { p2Power = 100; powerIsFromBonus[1] = false; }
     if((e.key === 'p' || e.code === 'KeyP') && !selectionPaused) { gamePaused = !gamePaused; } 
     if(e.key === 't' || e.code === 'KeyT') { showTimer = !showTimer; }
     
