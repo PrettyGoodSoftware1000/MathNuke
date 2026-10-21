@@ -1413,8 +1413,8 @@ const WEAPON_INFO = {
     32:  { icon: 'storage', desc: 'Nuke capacity +10 (max 13).' },
     33:  { icon: 'cluster', desc: 'Nukes split into 5 homing mini-nukes.' },
     5:   { icon: 'charge',  desc: 'Stop firing to charge. The next shot bursts into a 5x damage energy nova.' },
-    51:  { icon: 'charge',  desc: 'Each full charge fires 2 beams.' },
-    52:  { icon: 'charge',  desc: 'Each full charge fires 3 beams, and charges in 1.5s.' },
+    51:  { icon: 'charge',  desc: 'Each full charge fires 2 beams in a 15 degree spread.' },
+    52:  { icon: 'charge',  desc: 'Fires 3 beams, one straight and two angled out, and charges in 1.5s.' },
     4:   { icon: 'shield',  desc: 'Energy barrier. Absorbs a hit, then shatters into shrapnel.' },
     41:  { icon: 'shatter', desc: 'Reinforced barrier that absorbs 5 hits before shattering.' },
     100: { icon: 'nuke',    desc: 'Refill every nuke. Requires 3 arming codes.' }
@@ -1951,227 +1951,290 @@ function carapaceGrad(g, x, y, r, light, mid, dark) {
     return radGrad(g, x, y, r, [[0, light], [0.45, mid], [1, dark]], x - r * 0.35, y - r * 0.4);
 }
 
-// --- Player 1: swept-wing interceptor ---
-function paintInterceptor(team) {
-    return paint(64, 64, (g, w, h) => {
-        // Wings
-        const wing = [28, 24, 6, 44, 4, 50, 10, 53, 26, 47];
-        [wing, mirrorX(wing, w)].forEach((pts, side) => {
-            poly(g, pts); g.fillStyle = plateGrad(g, 24, 54); g.fill();
-            g.strokeStyle = '#0b0f14'; g.lineWidth = 0.9; g.stroke();
-            const m = x => side ? w - x : x;
-            line(g, m(28), 24.5, m(6), 44.5, 'rgba(210,225,240,0.7)', 0.6);      // leading edge highlight
-            line(g, m(12), 49.5, m(25), 43.5, 'rgba(10,14,20,0.8)', 0.5);         // panel seam
-            line(g, m(9), 46, m(22), 39, team, 1.8);                               // team stripe
-            line(g, m(10.5), 47.6, m(21), 42, hexA(team, 0.6), 0.7);
-            // Wing cannon pod
-            roundRect(g, m(15) - 2, 35, 4, 12, 1.5); g.fillStyle = hullGrad(g, m(15) - 2, m(15) + 2); g.fill();
-            g.strokeStyle = '#0b0f14'; g.lineWidth = 0.5; g.stroke();
-            g.fillStyle = '#20262d'; g.fillRect(m(15) - 0.6, 27, 1.2, 8.5);
+// Bio-mechanical parts: riveted plates, cables, piston legs and socketed eyes
+function rivet(g, x, y, r = 0.55) {
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = '#14181d'; g.fill();
+    g.beginPath(); g.arc(x - r * 0.25, y - r * 0.25, r * 0.6, 0, Math.PI * 2); g.fillStyle = '#c9d3dc'; g.fill();
+}
+function metalGrad(g, x0, y0, x1, y1) {
+    return linGrad(g, x0, y0, x1, y1, [[0, '#c3ced8'], [0.35, '#7a8794'], [0.7, '#3a434d'], [1, '#161b21']]);
+}
+function cable(g, x0, y0, cx, cy, x1, y1, w) {
+    [[w, '#101317'], [w * 0.45, '#5a6571']].forEach(([lw, col]) => {
+        g.strokeStyle = col; g.lineWidth = lw;
+        g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(cx, cy, x1, y1); g.stroke();
+    });
+}
+// Jointed mechanical limb through the given points, ending in a claw
+function pistonLeg(g, pts, w, clawColor) {
+    for (let i = 0; i < pts.length - 2; i += 2) {
+        [[w, '#101317'], [w * 0.5, '#8794a1']].forEach(([lw, col]) => {
+            g.strokeStyle = col; g.lineWidth = lw;
+            g.beginPath(); g.moveTo(pts[i], pts[i + 1]); g.lineTo(pts[i + 2], pts[i + 3]); g.stroke();
         });
-        // Engine nacelles
-        [[22.5, 29], [35, 41.5]].forEach(([x0, x1]) => {
-            roundRect(g, x0, 37, x1 - x0, 20, 2.5); g.fillStyle = hullGrad(g, x0, x1); g.fill();
-            g.strokeStyle = '#0b0f14'; g.lineWidth = 0.7; g.stroke();
-            line(g, x0 + 0.8, 44, x1 - 0.8, 44, 'rgba(8,12,16,0.7)', 0.5);
-            ellipse(g, (x0 + x1) / 2, 56.5, (x1 - x0) / 2 - 0.5, 1.6); g.fillStyle = '#0a0d11'; g.fill();
-        });
-        // Fuselage
-        const body = [32, 3, 35, 10, 37, 22, 38, 44, 35, 54, 29, 54, 26, 44, 27, 22, 29, 10];
-        poly(g, body); g.fillStyle = hullGrad(g, 26, 38); g.fill();
-        g.strokeStyle = '#0b0f14'; g.lineWidth = 0.9; g.stroke();
-        line(g, 27.4, 30, 36.6, 30, 'rgba(8,12,16,0.75)', 0.5);
-        line(g, 26.6, 40, 37.4, 40, 'rgba(8,12,16,0.75)', 0.5);
-        line(g, 30.6, 9, 29.5, 50, 'rgba(230,240,250,0.35)', 0.6);
-        // Nose chevron in team colour
-        poly(g, [29.3, 12.5, 32, 9.6, 34.7, 12.5, 34.7, 14.3, 32, 11.6, 29.3, 14.3]); g.fillStyle = team; g.fill();
-        // Dorsal intake grille
-        for (let y = 33; y < 39; y += 1.4) line(g, 30, y, 34, y, 'rgba(10,14,18,0.8)', 0.5);
-        // Canopy
-        ellipse(g, 32, 20, 3.2, 6);
-        g.fillStyle = radGrad(g, 32, 20, 6.5, [[0, '#9fe4ff'], [0.35, '#2a7fbf'], [1, '#06182a']], 30.8, 16.5); g.fill();
-        g.strokeStyle = '#0b0f14'; g.lineWidth = 0.7; g.stroke();
-        ellipse(g, 30.9, 17.2, 0.8, 2.4, -0.2); g.fillStyle = 'rgba(255,255,255,0.75)'; g.fill();
+    }
+    for (let i = 2; i < pts.length - 2; i += 2) {
+        g.beginPath(); g.arc(pts[i], pts[i + 1], w * 0.75, 0, Math.PI * 2);
+        g.fillStyle = radGrad(g, pts[i], pts[i + 1], w * 0.75, [[0, '#d5dde4'], [1, '#2a3038']], pts[i] - w * 0.3, pts[i + 1] - w * 0.3); g.fill();
+    }
+    const n = pts.length, tx = pts[n - 2], ty = pts[n - 1];
+    poly(g, [tx - w * 0.7, ty - w * 0.2, tx, ty + w * 1.4, tx + w * 0.7, ty - w * 0.2]);
+    g.fillStyle = clawColor; g.fill();
+}
+function bioEye(g, x, y, r, color, slit = true) {
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = metalGrad(g, x - r, y - r, x + r, y + r); g.fill();
+    g.beginPath(); g.arc(x, y, r * 0.74, 0, Math.PI * 2); g.fillStyle = '#05070a'; g.fill();
+    g.beginPath(); g.arc(x, y, r * 0.6, 0, Math.PI * 2);
+    g.fillStyle = radGrad(g, x, y, r * 0.6, [[0, '#ffffff'], [0.35, color], [1, hexA(color, 0.55)]]); g.fill();
+    if (slit) { ellipse(g, x, y, r * 0.13, r * 0.5); g.fillStyle = '#080808'; g.fill(); }
+    glowDot(g, x, y, r * 1.7, color, 0.55);
+    ellipse(g, x - r * 0.24, y - r * 0.3, r * 0.16, r * 0.11); g.fillStyle = 'rgba(255,255,255,0.9)'; g.fill();
+}
+function veins(g, paths, color, w) {
+    g.strokeStyle = color; g.lineWidth = w;
+    paths.forEach(([x0, y0, cx, cy, x1, y1]) => { g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(cx, cy, x1, y1); g.stroke(); });
+}
 
-        applyLighting(g, w, h);
-        // Engine and running lights
-        glowDot(g, 25.75, 57.5, 8, team);
-        glowDot(g, 38.25, 57.5, 8, team);
-        glowDot(g, 5, 49.5, 3, '#ff4040', 0.9);
-        glowDot(g, 59, 49.5, 3, '#40ff80', 0.9);
+// --- Player 1: compact white delta jet (from the original P1 sprite) ---
+function paintDeltaJet(team) {
+    return paint(64, 64, (g, w, h) => {
+        // Drawn in the original sprite's coordinates, enlarged 25% about its centre
+        g.translate(32, 34); g.scale(1.25, 1.25); g.translate(-32, -34);
+        const ceramic = (y0, y1) => linGrad(g, 0, y0, 0, y1, [[0, '#ffffff'], [0.5, '#d4dbe2'], [1, '#8d98a4']]);
+        const wing = [28.5, 28.5, 14.5, 37, 13.8, 48.3, 28, 43.5];
+        [wing, mirrorX(wing, w)].forEach((pts, side) => {
+            const m = x => side ? w - x : x;
+            poly(g, pts); g.fillStyle = ceramic(28, 48); g.fill();
+            g.strokeStyle = '#0e1318'; g.lineWidth = 0.8; g.stroke();
+            line(g, m(28.5), 29, m(14.6), 37.4, 'rgba(255,255,255,0.95)', 0.5);
+            line(g, m(17), 39.5, m(27), 34.5, 'rgba(60,72,86,0.6)', 0.35);          // panel seams
+            line(g, m(17.5), 44.5, m(27.5), 41.2, 'rgba(60,72,86,0.6)', 0.35);
+            // Blue wing stripes
+            poly(g, [m(22), 35.2, m(23.6), 34.4, m(23.6), 41.6, m(22), 42.2]); g.fillStyle = team; g.fill();
+            poly(g, [m(19.2), 36.8, m(20.4), 36.2, m(20.4), 43, m(19.2), 43.4]); g.fillStyle = hexA(team, 0.7); g.fill();
+            // Wingtip fin
+            roundRect(g, m(14.6) - (side ? 1.6 : 0), 36.5, 1.6, 12, 0.6); g.fillStyle = '#5d6874'; g.fill();
+        });
+        const body = [32, 16.5, 34.5, 21, 36, 28, 36.5, 44, 35, 50.5, 32, 48.6, 29, 50.5, 27.5, 44, 28, 28, 29.5, 21];
+        poly(g, body); g.fillStyle = linGrad(g, 27.5, 0, 36.5, 0, [[0, '#7f8a96'], [0.3, '#ffffff'], [0.6, '#dfe5ea'], [1, '#6d7884']]); g.fill();
+        g.strokeStyle = '#0e1318'; g.lineWidth = 0.8; g.stroke();
+        line(g, 28.6, 33, 35.4, 33, 'rgba(60,72,86,0.55)', 0.35);
+        line(g, 28.2, 40, 35.8, 40, 'rgba(60,72,86,0.55)', 0.35);
+        for (let y = 42; y < 47; y += 1.2) line(g, 30.2, y, 33.8, y, 'rgba(30,38,46,0.7)', 0.35); // vent
+        line(g, 32, 29, 32, 38, hexA(team, 0.9), 0.8);
+        // Canopy
+        ellipse(g, 32, 24.2, 2.3, 4.8);
+        g.fillStyle = radGrad(g, 32, 24, 5, [[0, '#bdeeff'], [0.4, team], [1, '#071a33']], 31.2, 21.5); g.fill();
+        g.strokeStyle = '#0e1318'; g.lineWidth = 0.6; g.stroke();
+        ellipse(g, 31.3, 22.4, 0.55, 1.7, -0.2); g.fillStyle = 'rgba(255,255,255,0.85)'; g.fill();
+        // Tail nozzle
+        ellipse(g, 32, 49.6, 2.2, 1); g.fillStyle = '#10151a'; g.fill();
+        applyLighting(g, w, h, 0.8);
+        glowDot(g, 32, 50.3, 6, team);
+        glowDot(g, 14.5, 48, 2.2, '#ff4040', 0.9);
+        glowDot(g, 49.5, 48, 2.2, '#40ff80', 0.9);
     });
 }
 
-// --- Player 2: twin-boom gunship ---
-function paintGunship(team) {
+// --- Player 2: heavy swept-wing fighter (from the original P2 sprite) ---
+function paintStrikeFighter(team) {
     return paint(64, 64, (g, w, h) => {
-        // Wings joining body to booms, with lift fans
-        const wing = [27, 26, 15, 24, 15, 44, 27, 46];
-        [wing, mirrorX(wing, w)].forEach((pts, side) => {
-            poly(g, pts); g.fillStyle = plateGrad(g, 24, 46); g.fill();
-            g.strokeStyle = '#0b0f14'; g.lineWidth = 0.8; g.stroke();
-            const cx = side ? w - 21 : 21;
-            g.beginPath(); g.arc(cx, 35, 4.6, 0, Math.PI * 2); g.fillStyle = '#0c1015'; g.fill();
-            g.strokeStyle = '#7d8a98'; g.lineWidth = 0.6; g.stroke();
-            for (let k = 0; k < 6; k++) {
-                const a = k * Math.PI / 3 + (side ? 0.3 : 0);
-                line(g, cx, 35, cx + Math.cos(a) * 4, 35 + Math.sin(a) * 4, '#56626f', 0.9);
-            }
-            g.beginPath(); g.arc(cx, 35, 1.2, 0, Math.PI * 2); g.fillStyle = '#9aa8b6'; g.fill();
+        const slate = (y0, y1) => linGrad(g, 0, y0, 0, y1, [[0, '#8193ad'], [0.5, '#4a5a72'], [1, '#232c3a']]);
+        const wing = [35.5, 22, 58, 37, 58, 48.5, 36.5, 40.5];
+        // Fins first so the wings overlap their roots
+        [[40, 26.5, 40.6, 16.5, 41.8, 17.5, 42, 27], [46, 29, 49.5, 21.5, 50.5, 22.6, 48, 30.5]].forEach(f => {
+            [f, mirrorX(f, w)].forEach(pts => { poly(g, pts); g.fillStyle = slate(16, 30); g.fill(); g.strokeStyle = '#0b0f16'; g.lineWidth = 0.6; g.stroke(); });
         });
-        // Booms with twin cannons
-        [9, 47].forEach(x0 => {
-            g.fillStyle = '#1b2026';
-            g.fillRect(x0 + 2, 8, 1.3, 11); g.fillRect(x0 + 4.7, 8, 1.3, 11);
-            roundRect(g, x0, 16, 8, 43, 3.5); g.fillStyle = hullGrad(g, x0, x0 + 8); g.fill();
-            g.strokeStyle = '#0b0f14'; g.lineWidth = 0.8; g.stroke();
-            g.fillStyle = team; g.fillRect(x0 + 0.6, 45, 6.8, 3);
-            g.fillStyle = hexA(team, 0.5); g.fillRect(x0 + 0.6, 49, 6.8, 1);
-            line(g, x0 + 0.6, 26, x0 + 7.4, 26, 'rgba(8,12,16,0.7)', 0.5);
-            line(g, x0 + 0.6, 38, x0 + 7.4, 38, 'rgba(8,12,16,0.7)', 0.5);
-            ellipse(g, x0 + 4, 58.3, 3, 1.4); g.fillStyle = '#0a0d11'; g.fill();
+        [mirrorX(wing, w), wing].forEach((pts, side) => {
+            const m = x => side ? x : w - x;
+            poly(g, pts); g.fillStyle = slate(22, 48); g.fill();
+            g.strokeStyle = '#0b0f16'; g.lineWidth = 0.9; g.stroke();
+            line(g, m(35.5), 22.5, m(57.8), 37.2, 'rgba(200,215,235,0.75)', 0.55);
+            line(g, m(40), 33, m(55), 42, 'rgba(12,16,24,0.7)', 0.4);
+            line(g, m(45), 32, m(45), 43.5, 'rgba(12,16,24,0.6)', 0.35);
+            line(g, m(51), 36, m(51), 46.5, 'rgba(12,16,24,0.6)', 0.35);
+            poly(g, [m(53), 40, m(57.6), 42.7, m(57.6), 45, m(53), 42.4]); g.fillStyle = team; g.fill();
         });
-        // Central body
-        const body = [32, 6, 37, 14, 38.5, 40, 35.5, 56, 28.5, 56, 25.5, 40, 27, 14];
-        poly(g, body); g.fillStyle = hullGrad(g, 25.5, 38.5); g.fill();
-        g.strokeStyle = '#0b0f14'; g.lineWidth = 0.9; g.stroke();
-        line(g, 26.5, 28, 37.5, 28, 'rgba(8,12,16,0.75)', 0.5);
-        line(g, 26.2, 44, 37.8, 44, 'rgba(8,12,16,0.75)', 0.5);
-        line(g, 30.6, 12, 29.6, 52, 'rgba(230,240,250,0.3)', 0.6);
-        poly(g, [28, 31, 32, 34.5, 36, 31, 36, 33.5, 32, 37, 28, 33.5]); g.fillStyle = team; g.fill();
-        // Chin turret
-        g.beginPath(); g.arc(32, 9.5, 2.2, 0, Math.PI * 2); g.fillStyle = '#2a323b'; g.fill();
-        g.fillStyle = '#15191e'; g.fillRect(31.4, 2.5, 1.2, 6);
-        // Canopy
-        ellipse(g, 32, 19, 3.4, 5.2);
-        g.fillStyle = radGrad(g, 32, 19, 6, [[0, '#ffe2b8'], [0.35, '#c06a24'], [1, '#1d0d04']], 30.8, 16); g.fill();
-        g.strokeStyle = '#0b0f14'; g.lineWidth = 0.7; g.stroke();
-        ellipse(g, 30.9, 16.8, 0.8, 2.1, -0.2); g.fillStyle = 'rgba(255,255,255,0.7)'; g.fill();
-
-        applyLighting(g, w, h);
-        glowDot(g, 13, 59, 7.5, team);
-        glowDot(g, 51, 59, 7.5, team);
-        glowDot(g, 32, 57, 5, team, 0.7);
+        // Engine pods
+        [[21.5, 27.3], [36.7, 42.5]].forEach(([x0, x1]) => {
+            roundRect(g, x0, 34, x1 - x0, 9, 1.8); g.fillStyle = hullGrad(g, x0, x1); g.fill();
+            g.strokeStyle = '#0b0f16'; g.lineWidth = 0.7; g.stroke();
+            ellipse(g, (x0 + x1) / 2, 42.6, (x1 - x0) / 2 - 0.6, 1.2); g.fillStyle = '#0a0d11'; g.fill();
+            line(g, x0 + 0.7, 37, x1 - 0.7, 37, 'rgba(8,12,16,0.7)', 0.4);
+        });
+        const body = [32, 5.5, 34, 11, 35.5, 18, 36.5, 38, 35, 46, 29, 46, 27.5, 38, 28.5, 18, 30, 11];
+        poly(g, body); g.fillStyle = linGrad(g, 27.5, 0, 36.5, 0, [[0, '#1d2533'], [0.3, '#93a4bd'], [0.55, '#5a6b84'], [1, '#161d29']]); g.fill();
+        g.strokeStyle = '#0b0f16'; g.lineWidth = 0.9; g.stroke();
+        line(g, 31, 7.5, 30.3, 44, 'rgba(220,230,245,0.3)', 0.5);
+        line(g, 28.6, 34, 35.4, 34, 'rgba(8,12,16,0.75)', 0.4);
+        line(g, 28.2, 40, 35.8, 40, 'rgba(8,12,16,0.75)', 0.4);
+        // Long gold canopy
+        roundRect(g, 29.6, 17, 4.8, 14, 2.4);
+        g.fillStyle = linGrad(g, 0, 17, 0, 31, [[0, '#fff1b0'], [0.35, '#f4b030'], [0.75, '#b0560e'], [1, '#4a1a04']]); g.fill();
+        g.strokeStyle = '#0b0f16'; g.lineWidth = 0.6; g.stroke();
+        roundRect(g, 30.6, 18.5, 1, 6, 0.5); g.fillStyle = 'rgba(255,255,255,0.75)'; g.fill();
+        applyLighting(g, w, h, 0.8);
+        glowDot(g, 32, 25, 5, '#ffb030', 0.45);
+        glowDot(g, 24.4, 43.4, 4.5, team);
+        glowDot(g, 39.6, 43.4, 4.5, team);
     });
 }
 
 // --- Aliens ---
-// Charger: winged diver with membranous wings and glowing eyes
+// Charger (no eyes): blade-winged alien interceptor following the original V shape
 function paintCharger() {
     return paint(32, 32, (g, w, h) => {
-        const wing = [14, 12, 2, 3.5, 0.8, 11.5, 3.8, 18.5, 7.8, 16.2, 9.8, 21.5, 14, 18];
-        [wing, mirrorX(wing, w)].forEach((pts, side) => {
-            poly(g, pts);
-            g.fillStyle = linGrad(g, 0, 3, 0, 21, [[0, 'rgba(225,70,140,0.92)'], [0.6, 'rgba(120,20,80,0.9)'], [1, 'rgba(50,6,36,0.95)']]);
-            g.fill(); g.strokeStyle = '#22061a'; g.lineWidth = 0.6; g.stroke();
+        const alloy = (x0, y0, x1, y1) => linGrad(g, x0, y0, x1, y1, [[0, '#ff8aa6'], [0.35, '#c8174e'], [0.75, '#5e0622'], [1, '#22020c']]);
+        const blade = [12.5, 16.5, 7, 9.5, 0.6, 0.6, 4.5, 3.2, 9.5, 8, 14, 12.5];
+        [blade, mirrorX(blade, w)].forEach((pts, side) => {
             const m = x => side ? w - x : x;
-            [[2.2, 4], [1.2, 11.5], [4, 18], [9.6, 20.8]].forEach(([x, y]) => line(g, m(14), 13, m(x), y, '#4a0f35', 0.55));
+            poly(g, pts); g.fillStyle = alloy(m(0), 0, m(14), 16); g.fill();
+            g.strokeStyle = '#1a0208'; g.lineWidth = 0.5; g.stroke();
+            line(g, m(0.9), 1, m(9.6), 8.3, '#ffd27a', 0.45);   // gold leading edge
+            line(g, m(3.5), 4.5, m(11.5), 13.5, '#ff6aa8', 0.5); // energy channel
         });
-        // Tail spine
-        poly(g, [14.4, 12, 16, 0.6, 17.6, 12]); g.fillStyle = carapaceGrad(g, 16, 7, 6, '#d47aa6', '#6a1d4e', '#22061a'); g.fill();
-        for (let y = 3; y < 12; y += 2.2) line(g, 15.1, y, 16.9, y, 'rgba(25,4,18,0.8)', 0.4);
-        // Body
-        ellipse(g, 16, 16, 4.6, 7.2); g.fillStyle = carapaceGrad(g, 16, 16, 7.5, '#e48ab8', '#7a2058', '#250619'); g.fill();
-        g.strokeStyle = '#22061a'; g.lineWidth = 0.6; g.stroke();
-        [12.5, 15.5, 18.5].forEach(y => { g.beginPath(); g.ellipse(16, y, 4.2, 1.5, 0, 0, Math.PI); g.strokeStyle = 'rgba(30,5,22,0.7)'; g.lineWidth = 0.4; g.stroke(); });
-        // Head and mandibles
-        ellipse(g, 16, 23, 3.3, 2.9); g.fillStyle = carapaceGrad(g, 16, 23, 3.5, '#a04070', '#4a0f35', '#1a0412'); g.fill();
-        g.strokeStyle = '#ead2b4'; g.lineWidth = 0.8;
-        g.beginPath(); g.moveTo(14.2, 24.5); g.quadraticCurveTo(12.4, 26.5, 13.4, 29.5); g.stroke();
-        g.beginPath(); g.moveTo(17.8, 24.5); g.quadraticCurveTo(19.6, 26.5, 18.6, 29.5); g.stroke();
-        ellipse(g, 14.6, 13, 1.1, 2.6, 0.2); g.fillStyle = 'rgba(255,220,240,0.45)'; g.fill();
-        applyLighting(g, w, h, 0.8);
-        glowDot(g, 14.7, 23.4, 1.9, '#ff2a50');
-        glowDot(g, 17.3, 23.4, 1.9, '#ff2a50');
+        // Lower ring and forward prongs
+        g.strokeStyle = '#1a0208'; g.lineWidth = 2.6;
+        g.beginPath(); g.moveTo(8, 25); g.quadraticCurveTo(16, 21.5, 24, 25); g.stroke();
+        g.strokeStyle = '#d9a84a'; g.lineWidth = 1.4;
+        g.beginPath(); g.moveTo(8, 25); g.quadraticCurveTo(16, 21.5, 24, 25); g.stroke();
+        [[7.5, 25, 5, 31.2], [24.5, 25, 27, 31.2]].forEach(([x0, y0, x1, y1]) => {
+            poly(g, [x0 - 1.4, y0, x1, y1, x0 + 1.4, y0 + 0.4]); g.fillStyle = alloy(x0 - 2, y0, x1 + 2, y1); g.fill();
+            g.strokeStyle = '#1a0208'; g.lineWidth = 0.4; g.stroke();
+        });
+        // Central hull
+        const hull = [16, 7.5, 21, 13, 19.5, 19.5, 16, 24.5, 12.5, 19.5, 11, 13];
+        poly(g, hull); g.fillStyle = alloy(11, 7, 21, 24); g.fill();
+        g.strokeStyle = '#d9a84a'; g.lineWidth = 0.6; g.stroke();
+        line(g, 16, 8.5, 16, 11.5, 'rgba(255,220,160,0.7)', 0.4);
+        // Crystal core
+        poly(g, [16, 11.3, 18.2, 14.5, 16, 18.5, 13.8, 14.5]);
+        g.fillStyle = linGrad(g, 13.8, 11, 18.2, 18.5, [[0, '#ffffff'], [0.4, '#ff8ad0'], [1, '#b0106a']]); g.fill();
+        applyLighting(g, w, h, 0.6);
+        glowDot(g, 16, 14.6, 6, '#ff4fa8', 0.9);
+        glowDot(g, 16, 7.8, 3.5, '#ff6a3a', 0.8);
+        glowDot(g, 5, 31, 1.8, '#ff6aa8');
+        glowDot(g, 27, 31, 1.8, '#ff6aa8');
     });
 }
 
-// Shooter: armoured acid beetle with a glowing green sac
+// Shooter (eyes): bio-mechanical invader - armoured green flesh dome, socketed eyes, piston legs
 function paintShooter() {
     return paint(32, 32, (g, w, h) => {
-        glowDot(g, 16, 16, 15, '#6dff2a', 0.35);
-        g.strokeStyle = '#2a1820'; g.lineWidth = 1.3;
-        [[10, 19, 4.5, 26], [11.5, 22, 8.5, 29.5], [22, 19, 27.5, 26], [20.5, 22, 23.5, 29.5]].forEach(([a, b, c, d]) => {
-            g.beginPath(); g.moveTo(a, b); g.quadraticCurveTo((a + c) / 2 + (c > a ? 1 : -1), b + 1, c, d); g.stroke();
+        glowDot(g, 16, 13, 16, '#6dff2a', 0.3);
+        // Outer piston legs and inner tendrils
+        pistonLeg(g, [4, 13, 1.8, 20, 2.6, 27], 1.7, '#d9ffb0');
+        pistonLeg(g, [28, 13, 30.2, 20, 29.4, 27], 1.7, '#d9ffb0');
+        veins(g, [[7, 16, 5, 19, 6, 22], [25, 16, 27, 19, 26, 22]], '#1d5a0e', 2);
+        veins(g, [[7, 16, 5, 19, 6, 22], [25, 16, 27, 19, 26, 22]], '#7ee03a', 0.7);
+        // Flesh dome
+        g.beginPath(); g.moveTo(1.5, 16); g.bezierCurveTo(1.5, 6, 8, 1.5, 16, 1.5); g.bezierCurveTo(24, 1.5, 30.5, 6, 30.5, 16);
+        g.quadraticCurveTo(16, 18.5, 1.5, 16); g.closePath();
+        g.fillStyle = radGrad(g, 16, 10, 16, [[0, '#d8ff8a'], [0.35, '#6fdc2a'], [0.75, '#22700c'], [1, '#0c2e04']], 12, 6); g.fill();
+        g.strokeStyle = '#0a2004'; g.lineWidth = 0.6; g.stroke();
+        veins(g, [[4, 13, 6, 10, 9, 14], [28, 13, 26, 10, 23, 14], [12, 15, 16, 13, 20, 15]], 'rgba(10,50,6,0.7)', 0.45);
+        // Armour: crown plate and spine
+        g.beginPath(); g.moveTo(6, 7); g.bezierCurveTo(8, 2.6, 12, 1.8, 16, 1.8); g.bezierCurveTo(20, 1.8, 24, 2.6, 26, 7);
+        g.quadraticCurveTo(16, 4.6, 6, 7); g.closePath();
+        g.fillStyle = metalGrad(g, 6, 1.8, 26, 7); g.fill(); g.strokeStyle = '#0d1014'; g.lineWidth = 0.5; g.stroke();
+        roundRect(g, 14.6, 4.8, 2.8, 11, 1); g.fillStyle = metalGrad(g, 14.6, 5, 17.4, 16); g.fill();
+        g.strokeStyle = '#0d1014'; g.lineWidth = 0.4; g.stroke();
+        [[9, 4.6], [16, 3.2], [23, 4.6], [16, 8], [16, 12.5]].forEach(([x, y]) => rivet(g, x, y, 0.5));
+        // Side armour plates bolted over the flesh
+        [[1.8, 12.5, 6.5, 11, 6.5, 16.2, 1.8, 15.8], [30.2, 12.5, 25.5, 11, 25.5, 16.2, 30.2, 15.8]].forEach(pts => {
+            poly(g, pts); g.fillStyle = metalGrad(g, pts[0], 11, pts[4], 16); g.fill(); g.strokeStyle = '#0d1014'; g.lineWidth = 0.4; g.stroke();
         });
-        // Acid sac
-        g.beginPath(); g.arc(16, 16, 9, 0, Math.PI * 2);
-        g.fillStyle = radGrad(g, 16, 16, 9, [[0, '#f0ffb8'], [0.3, '#9dff48'], [0.75, '#2f9a12'], [1, '#123d08']], 13, 13); g.fill();
-        g.strokeStyle = 'rgba(20,70,10,0.55)'; g.lineWidth = 0.5;
-        g.beginPath(); g.moveTo(10, 18); g.bezierCurveTo(13, 16, 15, 21, 19, 19); g.stroke();
-        g.beginPath(); g.moveTo(14, 23); g.bezierCurveTo(16, 20, 20, 22, 22, 17); g.stroke();
-        // Back carapace plates
-        g.beginPath(); g.moveTo(6.8, 15); g.quadraticCurveTo(8, 5, 16, 4); g.quadraticCurveTo(24, 5, 25.2, 15);
-        g.quadraticCurveTo(21, 11, 16, 11); g.quadraticCurveTo(11, 11, 6.8, 15); g.closePath();
-        g.fillStyle = carapaceGrad(g, 16, 9, 10, '#a07a8e', '#4e3040', '#1c0f16'); g.fill();
-        g.strokeStyle = '#140a10'; g.lineWidth = 0.6; g.stroke();
-        line(g, 16, 4.5, 16, 10.8, 'rgba(20,10,16,0.8)', 0.5);
-        line(g, 10.5, 7, 11.8, 11.6, 'rgba(20,10,16,0.7)', 0.4);
-        line(g, 21.5, 7, 20.2, 11.6, 'rgba(20,10,16,0.7)', 0.4);
-        // Face plate
-        ellipse(g, 16, 25, 4, 2.4); g.fillStyle = carapaceGrad(g, 16, 25, 4, '#8a6476', '#3c2430', '#140a10'); g.fill();
-        ellipse(g, 12.8, 13.5, 2, 1.2, -0.4); g.fillStyle = 'rgba(255,255,255,0.55)'; g.fill();
-        applyLighting(g, w, h, 0.7);
-        glowDot(g, 14.4, 24.8, 1.4, '#b6ff3a');
-        glowDot(g, 17.6, 24.8, 1.4, '#b6ff3a');
+        cable(g, 6.5, 12, 9, 15.5, 12, 15.6, 1);
+        cable(g, 25.5, 12, 23, 15.5, 20, 15.6, 1);
+        // Jaw grille
+        roundRect(g, 12, 16, 8, 4.4, 1.2); g.fillStyle = metalGrad(g, 12, 16, 20, 20.4); g.fill();
+        g.strokeStyle = '#0d1014'; g.lineWidth = 0.4; g.stroke();
+        for (let x = 13.4; x < 19.5; x += 1.6) { g.fillStyle = '#0a1a05'; g.fillRect(x, 17, 0.7, 2.6); }
+        applyLighting(g, w, h, 0.6);
+        for (let x = 13.4; x < 19.5; x += 1.6) glowDot(g, x + 0.35, 18.3, 1.3, '#9dff48', 0.8);
+        bioEye(g, 9.8, 10.4, 3.1, '#e6ff3a');
+        bioEye(g, 22.2, 10.4, 3.1, '#e6ff3a');
     });
 }
 
-// Bugger: tentacled hunter with a glowing cyan core
+// Bugger (eyes): bio-mechanical hunter - crested chitin hood, glowing vent, pincer legs
 function paintBugger() {
     return paint(32, 32, (g, w, h) => {
-        [[7, 1.5, 9], [12.5, 0.5, 13], [19.5, 0.5, 19], [25, 1.5, 23]].forEach(([tx, ty, cx]) => {
-            g.strokeStyle = '#0d3f48'; g.lineWidth = 2;
-            g.beginPath(); g.moveTo(16, 12); g.quadraticCurveTo(cx, 8, tx, ty); g.stroke();
-            g.strokeStyle = '#3fc6d6'; g.lineWidth = 0.7;
-            g.beginPath(); g.moveTo(16, 12); g.quadraticCurveTo(cx, 8, tx, ty); g.stroke();
+        glowDot(g, 16, 15, 16, '#3ff2ff', 0.28);
+        // Pincer legs curving inward
+        pistonLeg(g, [7, 19, 5, 25, 10, 30], 1.6, '#c8fbff');
+        pistonLeg(g, [25, 19, 27, 25, 22, 30], 1.6, '#c8fbff');
+        // Inner jaw spikes
+        [[13, 20, 13.8, 24.5, 15, 20], [17, 20, 18.2, 24.5, 19, 20]].forEach(pts => {
+            poly(g, pts); g.fillStyle = linGrad(g, 0, 20, 0, 24.5, [[0, '#9aa8b4'], [1, '#e8f6ff']]); g.fill();
         });
-        const fin = [10.5, 16, 3.5, 21.5, 10, 22];
-        [fin, mirrorX(fin, w)].forEach(pts => { poly(g, pts); g.fillStyle = 'rgba(60,200,220,0.75)'; g.fill(); g.strokeStyle = '#072a31'; g.lineWidth = 0.5; g.stroke(); });
-        ellipse(g, 16, 17, 6, 8.2); g.fillStyle = carapaceGrad(g, 16, 17, 8.5, '#c8fbff', '#2bb4c8', '#05242c'); g.fill();
-        g.strokeStyle = '#04191f'; g.lineWidth = 0.6; g.stroke();
-        [13, 16.5, 20].forEach(y => { g.beginPath(); g.ellipse(16, y, 5.4, 1.6, 0, 0, Math.PI); g.strokeStyle = 'rgba(4,30,36,0.7)'; g.lineWidth = 0.45; g.stroke(); });
-        poly(g, [13.4, 24, 16, 30.5, 18.6, 24]); g.fillStyle = linGrad(g, 0, 24, 0, 30.5, [[0, '#cfe9e6'], [1, '#55716e']]); g.fill();
-        g.strokeStyle = '#04191f'; g.lineWidth = 0.5; g.stroke();
-        ellipse(g, 13.8, 13.5, 1.3, 2.8, 0.2); g.fillStyle = 'rgba(255,255,255,0.5)'; g.fill();
-        applyLighting(g, w, h, 0.7);
-        glowDot(g, 16, 18, 5, '#5ff2ff', 0.9);
-        glowDot(g, 13.6, 22.5, 1.4, '#9ffcff');
-        glowDot(g, 18.4, 22.5, 1.4, '#9ffcff');
+        // Chitin hood (pointed top)
+        g.beginPath(); g.moveTo(16, 0.6); g.bezierCurveTo(22, 3, 30.5, 9, 31, 16.5); g.lineTo(31, 19.5);
+        g.quadraticCurveTo(16, 21.5, 1, 19.5); g.lineTo(1, 16.5); g.bezierCurveTo(1.5, 9, 10, 3, 16, 0.6); g.closePath();
+        g.fillStyle = radGrad(g, 16, 10, 17, [[0, '#d2fbff'], [0.35, '#35c8dc'], [0.75, '#0d5866'], [1, '#04212a']], 12, 6); g.fill();
+        g.strokeStyle = '#031418'; g.lineWidth = 0.6; g.stroke();
+        veins(g, [[4, 15, 6, 11, 9, 13], [28, 15, 26, 11, 23, 13]], 'rgba(3,40,48,0.7)', 0.45);
+        // Central crest ridge split by a glowing vent
+        poly(g, [16, 1.2, 18.6, 6, 18.6, 12.5, 13.4, 12.5, 13.4, 6]); g.fillStyle = metalGrad(g, 13.4, 1, 18.6, 12.5); g.fill();
+        g.strokeStyle = '#0d1014'; g.lineWidth = 0.4; g.stroke();
+        roundRect(g, 15.1, 6.5, 1.8, 5.2, 0.9); g.fillStyle = '#021014'; g.fill();
+        // Metal collar band
+        g.beginPath(); g.moveTo(1, 16.4); g.quadraticCurveTo(16, 18.4, 31, 16.4); g.lineTo(31, 19.6); g.quadraticCurveTo(16, 21.6, 1, 19.6); g.closePath();
+        g.fillStyle = metalGrad(g, 1, 16, 31, 21); g.fill(); g.strokeStyle = '#0d1014'; g.lineWidth = 0.45; g.stroke();
+        [4, 10, 16, 22, 28].forEach(x => rivet(g, x, 18.4 + (x === 16 ? 0.8 : 0.4), 0.45));
+        cable(g, 3, 16, 4, 12, 7.5, 9.5, 0.9);
+        cable(g, 29, 16, 28, 12, 24.5, 9.5, 0.9);
+        applyLighting(g, w, h, 0.6);
+        glowDot(g, 16, 9.1, 3.2, '#7ff6ff', 0.95);
+        bioEye(g, 10, 13.6, 2.9, '#a6fbff');
+        bioEye(g, 22, 13.6, 2.9, '#a6fbff');
     });
 }
 
-// Fatty: bloated brood carrier with glowing sacs and dangling tendrils
+// Fatty (eyes): bio-mechanical brood head - flesh face in an armoured frame, slit eyes,
+// a reactor ring for a nose and a grilled maw
 function paintFatty() {
     return paint(64, 64, (g, w, h) => {
-        glowDot(g, 32, 36, 32, '#ff3de0', 0.25);
-        [[20, 46, 15, 62], [26, 48, 24, 63], [32, 49, 33, 63], [38, 48, 41, 63], [44, 46, 49, 62]].forEach(([x0, y0, x1, y1]) => {
-            g.strokeStyle = '#3c1034'; g.lineWidth = 2.2;
-            g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo((x0 + x1) / 2 + 3, (y0 + y1) / 2, x1, y1); g.stroke();
-            g.strokeStyle = '#a0407e'; g.lineWidth = 0.7;
-            g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo((x0 + x1) / 2 + 3, (y0 + y1) / 2, x1, y1); g.stroke();
+        glowDot(g, 32, 32, 32, '#ff3de0', 0.25);
+        // Flesh face
+        g.beginPath(); g.arc(32, 32, 30, 0, Math.PI * 2);
+        g.fillStyle = radGrad(g, 32, 32, 30, [[0, '#ffb0ea'], [0.4, '#d23aa4'], [0.8, '#6a1050'], [1, '#2a0420']], 25, 22); g.fill();
+        veins(g, [[10, 26, 14, 30, 12, 36], [54, 26, 50, 30, 52, 36], [20, 40, 24, 37, 27, 40], [44, 40, 40, 37, 37, 40], [26, 9, 29, 12, 32, 10]], 'rgba(70,6,52,0.65)', 0.7);
+        // Armoured frame: segmented rim plates with gaps of exposed flesh
+        for (let k = 0; k < 8; k++) {
+            const a0 = k * Math.PI / 4 + 0.12, a1 = a0 + Math.PI / 4 - 0.24;
+            g.beginPath(); g.arc(32, 32, 31, a0, a1); g.arc(32, 32, 26, a1, a0, true); g.closePath();
+            g.fillStyle = metalGrad(g, 32 + Math.cos(a0) * 31, 32 + Math.sin(a0) * 31, 32 + Math.cos(a1) * 26, 32 + Math.sin(a1) * 26);
+            g.fill(); g.strokeStyle = '#0d1014'; g.lineWidth = 0.6; g.stroke();
+            const am = (a0 + a1) / 2;
+            rivet(g, 32 + Math.cos(am) * 28.5, 32 + Math.sin(am) * 28.5, 0.8);
+        }
+        // Heavy brow plates over the slit eyes
+        [[14, 13.5, 29, 16.5, 28, 20.5, 15, 18], [50, 13.5, 35, 16.5, 36, 20.5, 49, 18]].forEach(pts => {
+            poly(g, pts); g.fillStyle = metalGrad(g, pts[0], 13, pts[2], 21); g.fill(); g.strokeStyle = '#0d1014'; g.lineWidth = 0.6; g.stroke();
         });
-        // Fleshy underbelly
-        ellipse(g, 32, 37, 25, 16);
-        g.fillStyle = radGrad(g, 32, 37, 25, [[0, '#ff9ae0'], [0.45, '#b0307e'], [1, '#3a0a2c']], 28, 40); g.fill();
-        g.strokeStyle = '#2a0620'; g.lineWidth = 0.8; g.stroke();
-        // Dorsal shell
-        g.beginPath(); g.moveTo(5, 35); g.bezierCurveTo(6, 14, 20, 5, 32, 5); g.bezierCurveTo(44, 5, 58, 14, 59, 35);
-        g.quadraticCurveTo(48, 28, 32, 28); g.quadraticCurveTo(16, 28, 5, 35); g.closePath();
-        g.fillStyle = carapaceGrad(g, 32, 18, 26, '#b588b0', '#4e2650', '#150716'); g.fill();
-        g.strokeStyle = '#120612'; g.lineWidth = 0.9; g.stroke();
-        [[12, 30, 18, 9], [24, 28, 26, 6], [40, 28, 38, 6], [52, 30, 46, 9]].forEach(([a, b, c, d]) => line(g, a, b, c, d, 'rgba(18,6,18,0.75)', 0.7));
-        [[20, 11], [32, 6], [44, 11]].forEach(([x, y]) => {
-            poly(g, [x - 2.5, y + 2, x, y - 5, x + 2.5, y + 2]);
-            g.fillStyle = linGrad(g, 0, y - 5, 0, y + 2, [[0, '#f4e3c8'], [1, '#8a7258']]); g.fill();
+        [[21.5, 22.5], [42.5, 22.5]].forEach(([x, y]) => { ellipse(g, x, y, 6, 1.9); g.fillStyle = '#140010'; g.fill(); });
+        // Reactor ring nose with cables
+        cable(g, 26, 32, 18, 34, 9, 40, 2);
+        cable(g, 38, 32, 46, 34, 55, 40, 2);
+        g.beginPath(); g.arc(32, 32, 7.2, 0, Math.PI * 2); g.fillStyle = metalGrad(g, 25, 25, 39, 39); g.fill();
+        g.strokeStyle = '#0d1014'; g.lineWidth = 0.7; g.stroke();
+        g.beginPath(); g.arc(32, 32, 4, 0, Math.PI * 2); g.fillStyle = '#12000c'; g.fill();
+        for (let k = 0; k < 6; k++) rivet(g, 32 + Math.cos(k * Math.PI / 3) * 5.6, 32 + Math.sin(k * Math.PI / 3) * 5.6, 0.6);
+        // Maw: dark throat behind metal teeth
+        roundRect(g, 19, 43, 26, 10, 4); g.fillStyle = radGrad(g, 32, 48, 14, [[0, '#ff5ad8'], [0.4, '#7a0a5a'], [1, '#14000e']]); g.fill();
+        g.strokeStyle = '#0d1014'; g.lineWidth = 0.8; g.stroke();
+        for (let x = 21.5; x <= 42.5; x += 3) {
+            poly(g, [x - 1.1, 43.2, x, 46.6, x + 1.1, 43.2]); g.fillStyle = metalGrad(g, x - 1, 43, x + 1, 47); g.fill();
+            poly(g, [x - 1.1, 52.8, x, 49.6, x + 1.1, 52.8]); g.fillStyle = metalGrad(g, x - 1, 49, x + 1, 53); g.fill();
+        }
+        ellipse(g, 22, 10, 6, 2.2, -0.5); g.fillStyle = 'rgba(255,230,255,0.3)'; g.fill();
+        applyLighting(g, w, h, 0.7);
+        glowDot(g, 32, 32, 7, '#ff6af0', 0.95);
+        glowDot(g, 32, 48, 9, '#ff3de0', 0.55);
+        [[21.5, 22.5], [42.5, 22.5]].forEach(([x, y]) => {
+            g.save(); g.translate(x, y); g.scale(1, 0.32); glowDot(g, 0, 0, 6.5, '#ffb020'); g.restore();
         });
-        ellipse(g, 22, 15, 5, 2.2, -0.5); g.fillStyle = 'rgba(255,230,255,0.35)'; g.fill();
-        // Maw with teeth
-        ellipse(g, 32, 53, 5.5, 2.6); g.fillStyle = '#1a0412'; g.fill();
-        for (let x = 28; x <= 36; x += 2) { poly(g, [x - 0.7, 51.3, x, 53.4, x + 0.7, 51.3]); g.fillStyle = '#f1e2cc'; g.fill(); }
-        applyLighting(g, w, h, 0.8);
-        [[21, 40], [32, 43], [43, 40]].forEach(([x, y]) => glowDot(g, x, y, 5.5, '#ff4de0', 0.9));
-        [[26.5, 48.5], [32, 49.5], [37.5, 48.5]].forEach(([x, y]) => glowDot(g, x, y, 2.4, '#ffb020'));
     });
 }
 
@@ -2309,7 +2372,7 @@ function paintShield(color) {
 }
 
 const assets = {
-    p1: paintInterceptor('#3fb6ff'), p2: paintGunship('#ff8a3d'),
+    p1: paintDeltaJet('#3fb6ff'), p2: paintStrikeFighter('#ff8a3d'),
     charger: paintCharger(), shooter: paintShooter(),
     fatty: paintFatty(), bugger: paintBugger(),
     bullet: paintBolt('#ffb52e', false), enemyBullet: paintBolt('#ff4a1a', true), spore: paintSpore(),
@@ -2319,10 +2382,12 @@ const assets = {
 };
 // Custom sprites loaded from the debug bar may not have engines where ours do
 const customShipSprite = [false, false];
+// Engine exhausts for the built-in ships: [x, y, size, length] in 64x64 sprite space
 const ENGINE_PORTS = [
-    [[25.75, 57, 5], [38.25, 57, 5]],
-    [[13, 58.5, 4.5], [51, 58.5, 4.5], [32, 56.5, 3]]
+    [[32, 54, 4.5, 2.4]],
+    [[24.4, 43, 3.6, 4.2], [39.6, 43, 3.6, 4.2]]
 ];
+const ENGINE_COLORS = ['#3fb6ff', '#ff4a2a'];
 
 // Soft round glow and smoke puffs for particles, cached per colour
 const glowSpriteCache = new Map();
@@ -2355,12 +2420,13 @@ const BASE_BLASTER_CD = 400; // Base cooldown (half of original 200)
 const PLAYER_START_Y = HEIGHT - 70;
 
 // Charged Shot: stop firing to charge a beam that bursts into a 5x-damage energy nova.
-// Level 1: single beam, 2s charge. Level 2: 2 beams per charge.
-// Level 3: 3 beams per charge and a faster 1.5s charge.
+// Level 1: single beam, 2s charge. Level 2: 2 beams in a 15 degree spread.
+// Level 3: 3 beams (one straight, two angled 15 degrees out) and a faster 1.5s charge.
 const CHARGE_TIME_NORMAL = 2000;
 const CHARGE_TIME_FAST = 1500;
 const CHARGED_SHOT_DAMAGE = 5;
-const CHARGED_BURST_DELAY = 250; // delay between charged shots in a burst
+const CHARGED_SPREAD = 15 * Math.PI / 180; // angle between beams in a charged spread
+const CHARGED_BEAM_SPEED = 0.6;
 const CHARGED_NOVA_RADIUS = 64; // Nova blast is as wide as 2 player ships
 const CHARGE_SOUND_DELAY = 450; // Longer than the blaster cooldown, so autofire never starts the charge hum
 function isChargeReady(p) {
@@ -2389,8 +2455,8 @@ function getTintedSprite(img, color) {
 
 function initPlayers() {
     return [
-        { x: WIDTH * 0.25, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, chargedBurstShots: 0, chargedBurstTimer: 0, hasCollectedFirstPowerUp: false },
-        { x: WIDTH * 0.75, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, chargedBurstShots: 0, chargedBurstTimer: 0, hasCollectedFirstPowerUp: false }
+        { x: WIDTH * 0.25, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, hasCollectedFirstPowerUp: false },
+        { x: WIDTH * 0.75, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, hasCollectedFirstPowerUp: false }
     ];
 }
 const players = initPlayers();
@@ -3007,7 +3073,7 @@ function destroyRandomWeapon(p, pIdx) {
         let shieldName = p.shatterShieldLevel > 0 ? "Shatter Shield x5" : "Power Shield";
         weapons.push({ name: shieldName, destroy: () => { p.hasPowerShield = false; p.powerShieldHits = 0; p.shatterShieldLevel = 0; } });
     }
-    if (p.chargedShotLevel > 0) weapons.push({ name: "Charged Shot", destroy: () => { p.chargedShotLevel = 0; p.chargeTimer = 0; p.chargedBurstShots = 0; } });
+    if (p.chargedShotLevel > 0) weapons.push({ name: "Charged Shot", destroy: () => { p.chargedShotLevel = 0; p.chargeTimer = 0; } });
 
     if (weapons.length > 0) {
         let chosen = weapons[Math.floor(Math.random() * weapons.length)];
@@ -3546,20 +3612,20 @@ function updateWeaponMenuButtons() {
     }
 }
 
-function fireChargedBeam(p, owner) {
-    // Energy beam that bursts into a nova on impact
-    pBullets.push({ x: p.x + p.w/2 - 6, y: p.y - 24, w: 12, h: 48, owner: owner, charged: true });
-    sfx.shoot(1600);
+// Energy beam that bursts into a nova on impact; angle is radians from straight up
+function fireChargedBeam(p, owner, angle) {
+    pBullets.push({ x: p.x + p.w/2 - 6, y: p.y - 24, w: 12, h: 48, owner: owner, charged: true, angle: angle,
+                    vx: Math.sin(angle) * CHARGED_BEAM_SPEED, vy: -Math.cos(angle) * CHARGED_BEAM_SPEED });
 }
 
 function fireBlaster(p, owner) {
     let cooldown = p.hasDoubleSpeed ? BASE_BLASTER_CD / 2 : BASE_BLASTER_CD;
 
     if (isChargeReady(p)) {
-        fireChargedBeam(p, owner);
-        // Levels 2/3 fire extra beams in a row, 1/4s apart
-        p.chargedBurstShots = p.chargedShotLevel - 1;
-        p.chargedBurstTimer = CHARGED_BURST_DELAY;
+        // Fire every beam at once, fanned out CHARGED_SPREAD apart and centred on straight up
+        const beams = p.chargedShotLevel;
+        for (let k = 0; k < beams; k++) fireChargedBeam(p, owner, (k - (beams - 1) / 2) * CHARGED_SPREAD);
+        sfx.shoot(1600);
         p.chargeTimer = 0;
         p.cd = cooldown;
         return;
@@ -3924,16 +3990,6 @@ function update(dt) {
         if (p.state === 'entering') { p.y -= 0.3 * dt; if (p.y <= p.startY) { p.y = p.startY; p.state = 'active'; p.shieldTimer = 3000; } return; }
         if (p.shieldTimer > 0) p.shieldTimer -= dt;
         if (p.chargedShotLevel > 0) p.chargeTimer += dt;
-        // Fire queued charged burst shots (1/4s apart)
-        if (p.chargedBurstShots > 0) {
-            p.chargedBurstTimer -= dt;
-            if (p.chargedBurstTimer <= 0) {
-                fireChargedBeam(p, i);
-                p.chargedBurstShots--;
-                p.chargedBurstTimer = CHARGED_BURST_DELAY;
-                p.chargeTimer = 0;
-            }
-        }
         // Player 1 Controls
         if(i===0) {
             if (p1ControlType === 'keyboard') {
@@ -4251,7 +4307,8 @@ function update(dt) {
                 pBullets.splice(bIdx, 1);
                 if (b.charged) {
                     // Charged shot bursts into a nova; its damage is applied after this loop
-                    pendingNovas.push({ x: b.x + b.w/2, y: b.y });
+                    const a = b.angle || 0; // nova at the beam's tip
+                    pendingNovas.push({ x: b.x + b.w/2 + Math.sin(a) * b.h/2, y: b.y + b.h/2 - Math.cos(a) * b.h/2 });
                     break;
                 }
                 e.hp--;
@@ -4418,9 +4475,9 @@ function draw() {
         // Flickering engine exhaust
         if (!customShipSprite[i]) {
             ctx.save(); ctx.globalCompositeOperation = 'lighter';
-            ENGINE_PORTS[i].forEach(([ex, ey, size]) => {
-                const len = size * (2.2 + Math.random() * 0.8);
-                ctx.drawImage(getGlowSprite(TEAM_COLORS[i]), p.x + ex - size, p.y + ey - size * 0.6, size * 2, len);
+            ENGINE_PORTS[i].forEach(([ex, ey, size, length]) => {
+                const len = size * (length + Math.random() * 0.8);
+                ctx.drawImage(getGlowSprite(ENGINE_COLORS[i]), p.x + ex - size, p.y + ey - size * 0.6, size * 2, len);
             });
             ctx.restore();
         }
@@ -4546,10 +4603,14 @@ function draw() {
     ctx.globalCompositeOperation = 'lighter';
     pBullets.forEach(b => {
         if (b.charged) {
-            // Charged shot: glowing energy lance
-            ctx.drawImage(getGlowSprite('#33bbff'), b.x - 10, b.y - 8, b.w + 20, b.h + 16);
-            ctx.fillStyle = linGrad(ctx, b.x, 0, b.x + b.w, 0, [[0, 'rgba(40,140,255,0)'], [0.5, '#e8f8ff'], [1, 'rgba(40,140,255,0)']]);
-            ctx.fillRect(b.x, b.y, b.w, b.h);
+            // Charged shot: glowing energy lance, tilted along its flight path
+            ctx.save();
+            ctx.translate(b.x + b.w/2, b.y + b.h/2);
+            ctx.rotate(b.angle || 0);
+            ctx.drawImage(getGlowSprite('#33bbff'), -b.w/2 - 10, -b.h/2 - 8, b.w + 20, b.h + 16);
+            ctx.fillStyle = linGrad(ctx, -b.w/2, 0, b.w/2, 0, [[0, 'rgba(40,140,255,0)'], [0.5, '#e8f8ff'], [1, 'rgba(40,140,255,0)']]);
+            ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
+            ctx.restore();
         } else {
             ctx.drawImage(assets.bullet, b.x, b.y, b.w, b.h);
         }
