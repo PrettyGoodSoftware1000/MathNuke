@@ -98,7 +98,7 @@
         
         /* --- TOP RESOURCE BAR --- */
         #hud {
-            width: 1064px;
+            width: 1352px;
             height: 50px;
             margin: 0 auto 6px auto;
             display: flex;
@@ -213,7 +213,7 @@
         }
 
         #gameContainer {
-            width: 968px;
+            width: 1256px;
             height: 628px;
             position: relative;
             border: 4px solid #1c2733;
@@ -474,7 +474,7 @@
 
         /* --- BOTTOM CONSOLE --- */
         #console {
-            width: 1064px;
+            width: 1352px;
             height: 132px;
             margin: 6px auto 0 auto;
             display: flex;
@@ -649,7 +649,7 @@
 
         /* Minimap + mission readout in the console centre */
         .console-center {
-            width: 216px;
+            width: 236px;
             flex-shrink: 0;
         }
         .console-center .frame-inner {
@@ -661,15 +661,15 @@
             padding: 6px;
         }
         #minimap {
-            width: 160px;
-            height: 103px;
+            width: 200px;
+            height: 100px;
             border: 1px solid #4b5f72;
             box-shadow: 0 0 8px rgba(63,182,255,0.3);
         }
         .mission-info {
             display: flex;
             justify-content: space-between;
-            width: 160px;
+            width: 200px;
             font-family: var(--head-font);
             font-size: 9px;
             font-weight: 700;
@@ -681,19 +681,55 @@
 
         /* Disconnected P2 in single-player */
         .offline { opacity: 0.35; filter: grayscale(0.8); }
-        .console-panel.offline::after {
-            content: 'NO SIGNAL';
-            position: absolute;
-            inset: 0;
+        /* P2 console turns into a drop-in prompt while P2 is not playing */
+        .join-prompt { display: none; }
+        .console-panel.offline { opacity: 1; filter: none; }
+        .console-panel.offline .portrait,
+        .console-panel.offline .wargear { display: none; }
+        .console-panel.offline .join-prompt {
+            flex: 1;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            gap: 7px;
+            text-align: center;
+        }
+        .join-title {
             font-family: var(--head-font);
             font-weight: 900;
-            font-size: 20px;
-            letter-spacing: 6px;
-            color: #9fb3c6;
+            font-size: 15px;
+            letter-spacing: 3px;
+            color: var(--team);
+            text-shadow: 0 0 8px var(--team-soft);
         }
+        .join-title span { color: var(--gold); font-size: 11px; letter-spacing: 2px; text-shadow: 0 0 6px var(--gold-soft); }
+        .join-line {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e8f4ff;
+            animation: join-blink 1.2s ease-in-out infinite;
+        }
+        @keyframes join-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+        .join-line .key {
+            display: inline-block;
+            padding: 1px 8px;
+            margin: 0 3px;
+            font-family: var(--head-font);
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: #fff;
+            background: linear-gradient(180deg, #2c4a66 0%, #0b1520 100%);
+            border: 1px solid #9fe0ff;
+            box-shadow: 0 0 6px rgba(63,182,255,0.6);
+        }
+        .join-controls {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-dim);
+            line-height: 1.35;
+        }
+        .join-controls b { color: var(--team); font-family: var(--head-font); font-size: 10px; letter-spacing: 1px; }
 
         /* --- CONTROL BAR AT BOTTOM --- */
         #control-bar {
@@ -1088,7 +1124,7 @@
             </div>
 
             <div id="gameContainer">
-                <canvas id="gameCanvas" width="960" height="620" tabindex="1"></canvas>
+                <canvas id="gameCanvas" width="1248" height="620" tabindex="1"></canvas>
                 <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
                 <div id="p1-menu" class="weapon-menu team-p1"></div>
                 <div id="p2-menu" class="weapon-menu team-p2"></div>
@@ -1125,7 +1161,7 @@
             <div class="console-center glow-wrap">
                 <div class="frame chamfer" style="height:100%">
                 <div class="frame-inner chamfer">
-                    <canvas id="minimap" width="160" height="103"></canvas>
+                    <canvas id="minimap" width="200" height="100"></canvas>
                     <div class="mission-info"><span id="mission-time">0:00</span><span><b id="mission-hostiles">0</b> HOSTILES</span></div>
                 </div>
                 </div>
@@ -1133,6 +1169,11 @@
             <div class="console-panel team-p2 glow-wrap" id="p2-console">
                 <div class="frame chamfer" style="height:100%">
                 <div class="frame-inner chamfer">
+                    <div class="join-prompt">
+                        <div class="join-title">PLAYER 2 <span>// JOIN THE FIGHT</span></div>
+                        <div class="join-line">Press <span class="key">ENTER</span> on keyboard or <span class="key">START</span> on a gamepad</div>
+                        <div class="join-controls"><b>KEYS</b> A/D move &middot; W fire &middot; Q rockets &middot; E nuke<br><b>PAD</b> Stick move &middot; A fire &middot; B rockets &middot; X nuke</div>
+                    </div>
                     <div class="portrait"><canvas id="p2-portrait" width="108" height="108"></canvas><div class="portrait-tag">PLAYER 2</div></div>
                     <div class="wargear">
                         <div class="unit-name">WARGEAR <span class="unit-status" id="p2-status">ONLINE</span></div>
@@ -1372,7 +1413,7 @@ const WEAPON_INFO = {
     31:  { icon: 'storage', desc: 'Nuke capacity +2.' },
     32:  { icon: 'storage', desc: 'Nuke capacity +10 (max 13).' },
     33:  { icon: 'cluster', desc: 'Nukes split into 5 homing mini-nukes.' },
-    5:   { icon: 'charge',  desc: 'Hold fire to charge a piercing beam with 5x damage.' },
+    5:   { icon: 'charge',  desc: 'Stop firing to charge. The next shot bursts into a 5x damage energy nova.' },
     51:  { icon: 'charge',  desc: 'Each full charge fires 2 beams.' },
     52:  { icon: 'charge',  desc: 'Each full charge fires 3 beams, and charges in 1.5s.' },
     4:   { icon: 'shield',  desc: 'Energy barrier. Absorbs a hit, then shatters into shrapnel.' },
@@ -1694,38 +1735,45 @@ function drawAnswerField(cx, y, w, text, accent) {
 
 function displayOperator(op) { return op === '-' ? '−' : (op === 'x' || !op) ? '×' : op; }
 
-// Pre-rendered deep-space backdrop: nebula clouds, dust and a distant planet
-const nebulaBg = (() => {
-    const c = document.createElement('canvas');
-    const W = 960, H = 620;
-    c.width = W; c.height = H;
-    const n = c.getContext('2d');
-    n.fillStyle = '#04060b'; n.fillRect(0, 0, W, H);
-    [[0.18, 0.22, 380, '70,40,150'], [0.82, 0.12, 320, '20,90,170'], [0.62, 0.62, 420, '130,30,90'],
-     [0.1, 0.78, 300, '20,80,130'], [0.45, 0.4, 520, '30,50,100']].forEach(([x, y, r, col]) => {
-        const g = n.createRadialGradient(x * W, y * H, 0, x * W, y * H, r);
-        g.addColorStop(0, `rgba(${col},0.32)`); g.addColorStop(0.5, `rgba(${col},0.11)`); g.addColorStop(1, `rgba(${col},0)`);
-        n.fillStyle = g; n.fillRect(0, 0, W, H);
-    });
-    for (let i = 0; i < 500; i++) {
-        n.fillStyle = `rgba(200,220,255,${Math.random() * 0.22})`;
-        n.fillRect(Math.random() * W, Math.random() * H, 1, 1);
+// --- PLAYER 2 DROP-IN ---
+// In a 1 player game, a second player can join at any time from the P2 console prompt
+function canPlayer2Join() {
+    return playerSetupComplete && numPlayers === 1 && !gameOver;
+}
+
+function joinPlayer2(controlType) {
+    numPlayers = 2;
+    p2ControlType = controlType;
+    const p = players[1];
+    p.dead = false;
+    p.lives = defaultLives;
+    p.x = WIDTH * 0.75;
+    if (gameStarted) { p.state = 'entering'; p.y = HEIGHT + 64; }
+    else { p.state = 'active'; p.y = p.startY; }
+    ['p2Stats', 'p2-sidebar', 'p2-console'].forEach(id => document.getElementById(id).classList.remove('offline'));
+    showToast("P2 has joined the fight!");
+    canvas.focus();
+}
+
+// Start on any gamepad P1 isn't using joins P2 with that gamepad
+function pollPlayer2Join() {
+    if (!canPlayer2Join() || !navigator.getGamepads) return;
+    const pads = navigator.getGamepads();
+    for (let i = 0; i < pads.length; i++) {
+        const gp = pads[i];
+        if (!gp || !gp.buttons[9] || !gp.buttons[9].pressed) continue;
+        if (p1ControlType === 'gamepad' && i === gamepadIndex) continue;
+        if (gamepadIndex === null) gamepadIndex = i;
+        else if (i !== gamepadIndex) gamepadIndex2 = i;
+        joinPlayer2('gamepad');
+        return;
     }
-    // Distant planet peeking in from the lower right
-    const px = W * 0.93, py = H * 1.18, pr = 260;
-    const atm = n.createRadialGradient(px, py, pr * 0.9, px, py, pr * 1.18);
-    atm.addColorStop(0, 'rgba(90,170,255,0.35)'); atm.addColorStop(1, 'rgba(90,170,255,0)');
-    n.fillStyle = atm; n.beginPath(); n.arc(px, py, pr * 1.18, 0, Math.PI * 2); n.fill();
-    const body = n.createRadialGradient(px - pr * 0.5, py - pr * 0.6, 10, px, py, pr);
-    body.addColorStop(0, '#2c4d6e'); body.addColorStop(0.5, '#0d1a28'); body.addColorStop(1, '#02050a');
-    n.fillStyle = body; n.beginPath(); n.arc(px, py, pr, 0, Math.PI * 2); n.fill();
-    return c;
-})();
+}
 
 // --- 1. SETUP CONSTANTS & STATE ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const WIDTH = 960; const HEIGHT = 620;
+const WIDTH = 1248; const HEIGHT = 620;
 
 // Improve pixel art rendering
 ctx.imageSmoothingEnabled = false;
@@ -1927,13 +1975,15 @@ const assets = {
 const BASE_BLASTER_CD = 400; // Base cooldown (half of original 200)
 const PLAYER_START_Y = HEIGHT - 70;
 
-// Charged Shot: hold fire to charge a penetrating 5x-damage beam.
+// Charged Shot: stop firing to charge a beam that bursts into a 5x-damage energy nova.
 // Level 1: single beam, 2s charge. Level 2: 2 beams per charge.
 // Level 3: 3 beams per charge and a faster 1.5s charge.
 const CHARGE_TIME_NORMAL = 2000;
 const CHARGE_TIME_FAST = 1500;
 const CHARGED_SHOT_DAMAGE = 5;
 const CHARGED_BURST_DELAY = 250; // delay between charged shots in a burst
+const CHARGED_NOVA_RADIUS = 64; // Nova blast is as wide as 2 player ships
+const CHARGE_SOUND_DELAY = 450; // Longer than the blaster cooldown, so autofire never starts the charge hum
 function isChargeReady(p) {
     return p.chargedShotLevel > 0 && p.chargeTimer >= (p.chargedShotLevel >= 3 ? CHARGE_TIME_FAST : CHARGE_TIME_NORMAL);
 }
@@ -1967,6 +2017,8 @@ const rockets = [];
 const shockwaves = []; // For nuke shockwave effects
 const shieldFragments = []; // For power shield shatter fragments
 const miniNukes = []; // For cluster nuke mini nukes
+const novas = []; // Charged shot energy nova effects
+const pendingNovas = []; // Charged shot impacts, detonated after the enemy update loop
 
 // Nuke explosion radius (reduced from screen-wide)
 const NUKE_EXPLOSION_RADIUS = 150;
@@ -1979,6 +2031,97 @@ const starLayers = [ { count: 150, size: 1, speed: 0.001 }, { count: 75,  size: 
 function initStars() { stars.length = 0; starLayers.forEach(layer => { for(let i=0; i<layer.count; i++) stars.push({ x: Math.random() * WIDTH, y: Math.random() * HEIGHT, size: layer.size, speedBase: layer.speed }); }); }
 initStars();
 function updateStars(dt) { stars.forEach(star => { star.y += star.speedBase * dt; if(star.y > HEIGHT) { star.y = -star.size; star.x = Math.random() * WIDTH; }}); }
+// Pre-rendered deep-space backdrop: nebula clouds and dust (built on first use)
+let nebulaBg = null;
+function getNebulaBg() {
+    if (nebulaBg) return nebulaBg;
+    const c = document.createElement('canvas');
+    const W = WIDTH, H = HEIGHT;
+    c.width = W; c.height = H;
+    const n = c.getContext('2d');
+    n.fillStyle = '#04060b'; n.fillRect(0, 0, W, H);
+    [[0.18, 0.22, 380, '70,40,150'], [0.82, 0.12, 320, '20,90,170'], [0.62, 0.62, 420, '130,30,90'],
+     [0.1, 0.78, 300, '20,80,130'], [0.45, 0.4, 520, '30,50,100']].forEach(([x, y, r, col]) => {
+        const g = n.createRadialGradient(x * W, y * H, 0, x * W, y * H, r);
+        g.addColorStop(0, `rgba(${col},0.32)`); g.addColorStop(0.5, `rgba(${col},0.11)`); g.addColorStop(1, `rgba(${col},0)`);
+        n.fillStyle = g; n.fillRect(0, 0, W, H);
+    });
+    for (let i = 0; i < 650; i++) {
+        n.fillStyle = `rgba(200,220,255,${Math.random() * 0.22})`;
+        n.fillRect(Math.random() * W, Math.random() * H, 1, 1);
+    }
+    nebulaBg = c;
+    return c;
+}
+
+// --- PIXEL ART PLANETS (parallax background) ---
+// Rendered at low resolution with ordered dithering and a small palette, then drawn
+// scaled up with hard pixels so they match the sprite art.
+const BAYER_4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+function makePixelPlanet(size, palette, opts) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d');
+    const r = size / 2 - 2, cx = size / 2 - 0.5, cy = size / 2 - 0.5;
+    const L = [-0.62, -0.55, 0.56]; // light from the upper left
+    const craters = [];
+    for (let k = 0; k < (opts.craters || 0); k++) {
+        craters.push({ x: (Math.random() - 0.5) * 1.4, y: (Math.random() - 0.5) * 1.4, r: 0.12 + Math.random() * 0.2 });
+    }
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const dx = (x - cx) / r, dy = (y - cy) / r, d2 = dx * dx + dy * dy;
+            const dither = (BAYER_4[y % 4][x % 4] + 0.5) / 16 - 0.5;
+            if (d2 > 1) {
+                // One-pixel atmosphere rim on the lit side
+                if (opts.atmosphere && d2 < Math.pow(1 + 1.6 / r, 2) && dx * L[0] + dy * L[1] > 0.1) {
+                    g.fillStyle = opts.atmosphere; g.fillRect(x, y, 1, 1);
+                }
+                continue;
+            }
+            const nz = Math.sqrt(1 - d2);
+            const light = dx * L[0] + dy * L[1] + nz * L[2];
+            let surface = 0;
+            if (opts.bands) surface += Math.sin(dy * opts.bands + Math.sin(dx * 2.5 + dy * 4) * 0.9) * 0.18;
+            craters.forEach(cr => { if (Math.hypot(dx - cr.x, dy - cr.y) < cr.r) surface -= 0.22; });
+            const shade = Math.max(0, Math.min(0.999, (light * 0.5 + 0.5) + surface + dither * 0.28));
+            g.fillStyle = palette[Math.floor(shade * palette.length)];
+            g.fillRect(x, y, 1, 1);
+        }
+    }
+    return c;
+}
+
+const backgroundPlanets = [
+    // Banded gas giant, far away and slow
+    { img: makePixelPlanet(64, ['#05070f', '#0d1430', '#1b2a5c', '#2c4a8a', '#3f74b0', '#6aa8d8', '#b4e0f2'], { bands: 9, atmosphere: '#6fd0ff' }),
+      scale: 4, x: 0.8, y: 0.62, speed: 0.0035 },
+    // Cratered moon, closer and a bit faster
+    { img: makePixelPlanet(16, ['#0b0b12', '#2a2833', '#4f4b5c', '#807a8c', '#bdb6c4'], { craters: 4 }),
+      scale: 4, x: 0.3, y: 0.28, speed: 0.006 }
+];
+function initPlanets() {
+    backgroundPlanets.forEach(pl => { pl.size = pl.img.width * pl.scale; pl.x *= WIDTH; pl.y *= HEIGHT; });
+}
+initPlanets();
+function updatePlanets(dt) {
+    backgroundPlanets.forEach(pl => {
+        pl.y += pl.speed * dt;
+        if (pl.y - pl.size / 2 > HEIGHT) {
+            // Drift back in from above at a new spot
+            pl.y = -pl.size / 2 - Math.random() * 300;
+            pl.x = WIDTH * (0.1 + Math.random() * 0.8);
+        }
+    });
+}
+function drawPlanets() {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = 0.9;
+    backgroundPlanets.forEach(pl => ctx.drawImage(pl.img, Math.round(pl.x - pl.size / 2), Math.round(pl.y - pl.size / 2), pl.size, pl.size));
+    ctx.restore();
+}
+
 function drawStars() { ctx.fillStyle = '#fff'; stars.forEach(star => ctx.fillRect(star.x, star.y, star.size, star.size)); }
 
 // --- 5. CONFIG & FILE LOADING ---
@@ -2243,6 +2386,38 @@ const sfx = {
             osc.start(t); osc.stop(t + 0.4);
         });
     },
+    nova: () => {
+        // Bright energy burst: a falling sine zap over a filtered noise puff
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1400, t); osc.frequency.exponentialRampToValueAtTime(180, t + 0.35);
+        gain.gain.setValueAtTime(0.12, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+        osc.connect(gain); gain.connect(audioCtx.destination); osc.start(t); osc.stop(t + 0.4);
+        const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.3, audioCtx.sampleRate);
+        const data = buf.getChannelData(0); for(let i=0; i<data.length; i++) data[i] = Math.random() * 2 - 1;
+        const noise = audioCtx.createBufferSource(); noise.buffer = buf;
+        const filter = audioCtx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 2500; filter.Q.value = 1.5;
+        const nGain = audioCtx.createGain();
+        nGain.gain.setValueAtTime(0.15, t); nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+        noise.connect(filter); filter.connect(nGain); nGain.connect(audioCtx.destination); noise.start(t);
+    },
+    chargeReady: () => {
+        // Short bright chime when the charge completes
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        [1318.5, 1760].forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            const t = audioCtx.currentTime + idx * 0.05;
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.linearRampToValueAtTime(0.06, t + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t + 0.25);
+        });
+    },
     rocketLaunch: () => {
         if(audioCtx.state === 'suspended') audioCtx.resume();
         const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
@@ -2282,6 +2457,71 @@ const sfx = {
         gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5); noise.start();
     }
 };
+
+// Charged shot hum, modelled on Super Metroid's charge beam: a rising, warbling
+// whine while charging, then a steady pulsing loop once fully charged.
+const chargeSounds = [null, null];
+
+function startChargeSound() {
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    const s = {
+        osc: audioCtx.createOscillator(), osc2: audioCtx.createOscillator(), lfo: audioCtx.createOscillator(),
+        lfoDepth: audioCtx.createGain(), amp: audioCtx.createGain(), master: audioCtx.createGain(),
+        filter: audioCtx.createBiquadFilter(), full: false
+    };
+    s.osc.type = 'sawtooth'; s.osc2.type = 'square';
+    s.osc.frequency.value = 140; s.osc2.frequency.value = 281; // octave up, slightly detuned for shimmer
+    s.filter.type = 'lowpass'; s.filter.frequency.value = 600; s.filter.Q.value = 8;
+    // Tremolo: amp gain swings between 0 and 1
+    s.amp.gain.value = 0.5; s.lfoDepth.gain.value = 0.5;
+    s.lfo.type = 'sine'; s.lfo.frequency.value = 8;
+    s.master.gain.value = 0;
+    s.osc.connect(s.filter); s.osc2.connect(s.filter);
+    s.filter.connect(s.amp); s.amp.connect(s.master); s.master.connect(audioCtx.destination);
+    s.lfo.connect(s.lfoDepth); s.lfoDepth.connect(s.amp.gain);
+    s.osc.start(); s.osc2.start(); s.lfo.start();
+    return s;
+}
+
+function stopChargeSound(s) {
+    const t = audioCtx.currentTime;
+    s.master.gain.cancelScheduledValues(t);
+    s.master.gain.setTargetAtTime(0, t, 0.02);
+    [s.osc, s.osc2, s.lfo].forEach(o => o.stop(t + 0.15));
+}
+
+function updateChargeSounds() {
+    const running = gameStarted && !gameOver && !gamePaused && !selectionPaused && !postChallengePaused && !mathChallenge.active && !continueChallenge.active;
+    players.forEach((p, i) => {
+        const charging = running && !p.dead && p.state === 'active' && p.chargedShotLevel > 0 && p.chargeTimer > CHARGE_SOUND_DELAY;
+        let s = chargeSounds[i];
+        if (!charging) {
+            if (s) { stopChargeSound(s); chargeSounds[i] = null; }
+            return;
+        }
+        if (!s) s = chargeSounds[i] = startChargeSound();
+        const chargeTime = p.chargedShotLevel >= 3 ? CHARGE_TIME_FAST : CHARGE_TIME_NORMAL;
+        const f = Math.min(1, (p.chargeTimer - CHARGE_SOUND_DELAY) / (chargeTime - CHARGE_SOUND_DELAY));
+        const t = audioCtx.currentTime;
+        if (f < 1) {
+            // Rising sweep, warbling faster as it climbs
+            const freq = 140 + 620 * f * f;
+            s.osc.frequency.setTargetAtTime(freq, t, 0.03);
+            s.osc2.frequency.setTargetAtTime(freq * 2.01, t, 0.03);
+            s.filter.frequency.setTargetAtTime(600 + 3200 * f, t, 0.05);
+            s.lfo.frequency.setTargetAtTime(8 + 18 * f, t, 0.05);
+            s.master.gain.setTargetAtTime(0.045, t, 0.05);
+        } else {
+            if (!s.full) { s.full = true; sfx.chargeReady(); }
+            // Fully charged: steady pulsing hum at a lower volume
+            s.osc.frequency.setTargetAtTime(330, t, 0.06);
+            s.osc2.frequency.setTargetAtTime(663, t, 0.06);
+            s.filter.frequency.setTargetAtTime(2200, t, 0.06);
+            s.lfo.frequency.setTargetAtTime(12, t, 0.06);
+            s.master.gain.setTargetAtTime(0.025, t, 0.1);
+        }
+    });
+}
 
 let spawnTimer = 0;
 
@@ -2866,8 +3106,8 @@ function updateWeaponMenuButtons() {
 }
 
 function fireChargedBeam(p, owner) {
-    // Penetrating energy beam, 5x damage
-    pBullets.push({ x: p.x + p.w/2 - 6, y: p.y - 24, w: 12, h: 48, owner: owner, charged: true, hitList: [] });
+    // Energy beam that bursts into a nova on impact
+    pBullets.push({ x: p.x + p.w/2 - 6, y: p.y - 24, w: 12, h: 48, owner: owner, charged: true });
     sfx.shoot(1600);
 }
 
@@ -3043,6 +3283,40 @@ function detonateNuke(x, y, isCluster = false, isMini = false) {
     }
 }
 
+// Destroys enemies[i] and rolls its power up / nuke drops
+function killEnemyWithDrops(e, i) {
+    if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false;
+    let configName = e.type + 's';
+    if(e.type === 'fatty') configName = 'fatties';
+    let baseChance = (enemyConfig[configName] && enemyConfig[configName].dropChance) || 0;
+    let chance = baseChance * getDropRateMultiplier(); // Decreases with more upgrades
+    if (Math.random() < chance) capsules.push({ x: e.x + e.w/2 - 8, y: e.y, w: 16, h: 24, type: 'energy' });
+    let nukeChance = (enemyConfig[configName] && enemyConfig[configName].nukeChance) || 0;
+    // Only drop nukes if at least one player has unlocked nuclear weapon
+    let anyPlayerHasNukes = players[0].hasNuclearWeapon || players[1].hasNuclearWeapon;
+    if (anyPlayerHasNukes && Math.random() < nukeChance) capsules.push({ x: e.x + e.w/2 - 16, y: e.y, w: 32, h: 32, type: 'nuke' });
+    createExplosion(e.x+e.w/2, e.y+e.h/2, e.color);
+    sfx.explosion(e.type);
+    enemies.splice(i, 1);
+}
+
+function detonateChargedNova(x, y) {
+    novas.push({ x: x, y: y, age: 0 });
+    sfx.nova();
+    for (let k = 0; k < 24; k++) {
+        let a = (k / 24) * Math.PI * 2, spd = 3 + Math.random() * 2;
+        particles.push({ x: x, y: y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life: 0.8, color: ['#33bbff', '#88ddff', '#ffffff'][k % 3], size: 3 + Math.random() * 3 });
+    }
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        // Hit if any part of the enemy is inside the blast
+        let nx = Math.max(e.x, Math.min(x, e.x + e.w)), ny = Math.max(e.y, Math.min(y, e.y + e.h));
+        if (Math.hypot(nx - x, ny - y) > CHARGED_NOVA_RADIUS) continue;
+        e.hp -= CHARGED_SHOT_DAMAGE;
+        if (e.hp > 0) e.flashTimer = 5; else killEnemyWithDrops(e, i);
+    }
+}
+
 function updateBullets(arr, spd, dt) { 
     for(let i=arr.length-1; i>=0; i--) { 
         let b = arr[i];
@@ -3104,7 +3378,7 @@ function drawMathChallenge() {
 function update(dt) {
     document.getElementById('p1-fill').style.height = p1Power + '%'; document.getElementById('p2-fill').style.height = p2Power + '%';
     checkPowerLevels(); updateNukeDisplay(); updateRocketDisplay();
-    if(showStars) updateStars(dt);
+    if(showStars) { updateStars(dt); updatePlanets(dt); }
     
     // Check for gamepad start
     if (!gameStarted && playerSetupComplete && p1ControlType === 'gamepad' && gamepadIndex !== null) {
@@ -3233,7 +3507,6 @@ function update(dt) {
                     launchRockets(p, missilesToFire); 
                     p.currentMissiles = 0;
                     p.missileReloadTimer = 0;
-                    showToast(`P1 ${p.hasOchoMissiles ? 'Ocho' : 'Rockets'} Launched! (${missilesToFire} missiles)`); 
                 }
                 if(keys['KeyX'] && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(0); } 
             } else if (p1ControlType === 'gamepad' && gamepadIndex !== null) {
@@ -3249,7 +3522,6 @@ function update(dt) {
                         launchRockets(p, missilesToFire); 
                         p.currentMissiles = 0;
                         p.missileReloadTimer = 0;
-                        showToast(`P1 ${p.hasOchoMissiles ? 'Ocho' : 'Rockets'} Launched! (${missilesToFire} missiles)`); 
                     }
                     if(gp.buttons[2].pressed && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(0); }
                 }
@@ -3269,7 +3541,6 @@ function update(dt) {
                     launchRockets(p, missilesToFire); 
                     p.currentMissiles = 0;
                     p.missileReloadTimer = 0;
-                    showToast(`P2 ${p.hasOchoMissiles ? 'Ocho' : 'Rockets'} Launched! (${missilesToFire} missiles)`); 
                 }
                 if(keys['KeyE'] && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(1); }
             } else if (p2ControlType === 'gamepad') {
@@ -3287,7 +3558,6 @@ function update(dt) {
                             launchRockets(p, missilesToFire); 
                             p.currentMissiles = 0;
                             p.missileReloadTimer = 0;
-                            showToast(`P2 ${p.hasOchoMissiles ? 'Ocho' : 'Rockets'} Launched! (${missilesToFire} missiles)`); 
                         }
                         if(gp.buttons[2].pressed && p.hasNuclearWeapon && p.nukes > 0) { launchNuke(1); }
                     }
@@ -3488,6 +3758,8 @@ function update(dt) {
         }
     }
     
+    for(let i=novas.length-1; i>=0; i--) { novas[i].age += dt; if(novas[i].age > 400) novas.splice(i, 1); }
+
     // Update shockwaves
     for(let i=shockwaves.length-1; i>=0; i--) {
         let sw = shockwaves[i];
@@ -3535,31 +3807,17 @@ function update(dt) {
         for(let bIdx=pBullets.length-1; bIdx>=0; bIdx--) {
             let b = pBullets[bIdx];
             if(rectIntersect(e, b)) {
+                pBullets.splice(bIdx, 1);
                 if (b.charged) {
-                    // Charged shot: 5x damage, penetrates (only damages each enemy once)
-                    if (b.hitList.includes(e)) continue;
-                    b.hitList.push(e);
-                    e.hp -= CHARGED_SHOT_DAMAGE;
-                } else {
-                    e.hp--;
-                    pBullets.splice(bIdx, 1);
+                    // Charged shot bursts into a nova; its damage is applied after this loop
+                    pendingNovas.push({ x: b.x + b.w/2, y: b.y });
+                    break;
                 }
+                e.hp--;
                 if(e.hp > 0) {
                     e.flashTimer = 5;
                 } else {
-                    if(e.type === 'shooter' && e.slotIndex !== -1) SWARM.slots[e.slotIndex] = false;
-                    let configName = e.type + 's';
-                    if(e.type === 'fatty') configName = 'fatties';
-                    let baseChance = (enemyConfig[configName] && enemyConfig[configName].dropChance) || 0;
-                    let chance = baseChance * getDropRateMultiplier(); // Decreases with more upgrades
-                    if (Math.random() < chance) capsules.push({ x: e.x + e.w/2 - 8, y: e.y, w: 16, h: 24, type: 'energy' });
-                    let nukeChance = (enemyConfig[configName] && enemyConfig[configName].nukeChance) || 0;
-                    // Only drop nukes if at least one player has unlocked nuclear weapon
-                    let anyPlayerHasNukes = players[0].hasNuclearWeapon || players[1].hasNuclearWeapon;
-                    if (anyPlayerHasNukes && Math.random() < nukeChance) capsules.push({ x: e.x + e.w/2 - 16, y: e.y, w: 32, h: 32, type: 'nuke' });
-                    createExplosion(e.x+e.w/2, e.y+e.h/2, e.color);
-                    sfx.explosion(e.type);
-                    enemies.splice(i, 1);
+                    killEnemyWithDrops(e, i);
                     destroyed = true;
                 }
                 break;
@@ -3585,6 +3843,10 @@ function update(dt) {
             enemies.splice(i, 1);
         }
     }
+
+    // Charged shot novas damage every enemy caught in the blast
+    pendingNovas.forEach(n => detonateChargedNova(n.x, n.y));
+    pendingNovas.length = 0;
 
     for(let i=capsules.length-1; i>=0; i--) {
         let c = capsules[i]; 
@@ -3642,8 +3904,9 @@ function update(dt) {
 }
 
 function draw() {
-    ctx.drawImage(nebulaBg, 0, 0);
+    ctx.drawImage(getNebulaBg(), 0, 0);
     if(showStars) drawStars();
+    drawPlanets();
     if(!playerSetupComplete) {
         // Show waiting message until setup is complete
         drawGlowText("AWAITING MISSION PARAMETERS", WIDTH/2, HEIGHT/2, 22, '#3fb6ff', { weight: 700, spacing: 4 });
@@ -3755,6 +4018,23 @@ function draw() {
         }
     });
     
+    // Draw charged shot novas: blue core flash with an expanding ring
+    novas.forEach(n => {
+        let t = n.age / 400, r = CHARGED_NOVA_RADIUS * Math.min(1, n.age / 150);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        let core = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+        core.addColorStop(0, `rgba(255,255,255,${0.9 * (1 - t)})`);
+        core.addColorStop(0.4, `rgba(60,170,255,${0.6 * (1 - t)})`);
+        core.addColorStop(1, 'rgba(0,80,255,0)');
+        ctx.fillStyle = core;
+        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `rgba(140,220,255,${1 - t})`; ctx.lineWidth = 4;
+        ctx.shadowColor = '#33bbff'; ctx.shadowBlur = 16;
+        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+    });
+
     // Draw shield fragments - bright red with strong glow
     shieldFragments.forEach(frag => {
         ctx.save();
@@ -3923,6 +4203,7 @@ window.addEventListener('keydown', e => {
         }
         return; 
     }
+    if(e.code === 'Enter' && canPlayer2Join()) { joinPlayer2('keyboard'); return; }
     if(e.key === 'o' || e.code === 'KeyO') { p1Power = 100; powerIsFromBonus[0] = false; }
     // Changed W key behavior - only fill P2 power if P2 is using keyboard for shooting (not using W for movement)
     if((e.key === 'w' || e.code === 'KeyW') && (numPlayers === 1 || p2ControlType !== 'keyboard')) { p2Power = 100; powerIsFromBonus[1] = false; }
@@ -3984,7 +4265,7 @@ let setupCheckInterval = setInterval(() => {
     }
 }, 500);
 
-function loop(t) { let dt = t - lastTime; if(dt>100) dt=100; lastTime = t; update(dt); draw(); updateConsole(); requestAnimationFrame(loop); }
+function loop(t) { let dt = t - lastTime; if(dt>100) dt=100; lastTime = t; update(dt); draw(); updateConsole(); updateChargeSounds(); pollPlayer2Join(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
 </script>
 </body>
