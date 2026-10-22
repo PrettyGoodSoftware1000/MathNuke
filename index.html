@@ -1511,6 +1511,8 @@ const ICONS = {
     cluster: '<circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="4.5" cy="5" r="2.4" fill="currentColor"/><circle cx="19.5" cy="5" r="2.4" fill="currentColor"/><circle cx="4.5" cy="19" r="2.4" fill="currentColor"/><circle cx="19.5" cy="19" r="2.4" fill="currentColor"/><path stroke="currentColor" stroke-width="1.5" d="M6.5 7l2.5 2.5M17.5 7L15 9.5M6.5 17l2.5-2.5M17.5 17L15 14.5"/>',
     charge: '<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2.3"/><path fill="currentColor" d="M13 4.5L7 13.2h4.4L10.6 19.5 17 10.6h-4.5z"/>',
     shield: '<path fill="currentColor" d="M12 1.5l9 3.4v6.4c0 5.4-3.8 9.6-9 11.2-5.2-1.6-9-5.8-9-11.2V4.9z"/><path fill="#000" fill-opacity=".35" d="M12 4.2v15.9c3.6-1.4 6.3-4.6 6.3-8.8V6.6z"/>',
+    gamma: '<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2.3"/><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M6.5 7.5c2.6 0 4 2.6 5.5 6.5v5M17.5 7.5c-2.6 0-4 2.6-5.5 6.5"/>',
+    minigun: '<path fill="currentColor" d="M1.5 6.5h13v2.4h-13zM1.5 10.8h13v2.4h-13zM1.5 15.1h13v2.4h-13zM14 4.5h4.5v15H14zM18.5 8h4v8h-4z"/>',
     shatter: '<path fill="none" stroke="currentColor" stroke-width="2" d="M12 1.5l9 3.4v6.4c0 5.4-3.8 9.6-9 11.2-5.2-1.6-9-5.8-9-11.2V4.9z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="bevel" d="M12 2l-2 6 4 3-3.5 4 2 7"/>'
 };
 function svgIcon(name) { return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`; }
@@ -1531,7 +1533,11 @@ const WEAPON_INFO = {
     33:  { icon: 'cluster', desc: 'Nukes split into 5 homing mini-nukes.' },
     5:   { icon: 'charge',  desc: 'Stop firing to charge. The next shot bursts into a 5x damage energy nova.' },
     51:  { icon: 'charge',  desc: 'Each full charge fires 2 beams in a 15 degree spread.' },
-    52:  { icon: 'charge',  desc: 'Fires 3 beams, one straight and two angled out, and charges in 1.5s.' },
+    52:  { icon: 'charge',  desc: 'Fires 3 beams, one straight and two angled out, and charges in 1.25s.' },
+    53:  { icon: 'charge',  desc: 'Each full charge fires 5 beams in a 60 degree fan.' },
+    54:  { icon: 'gamma',   desc: 'Violet gamma beams pierce basic enemies, exploding at every one they pass through.' },
+    6:   { icon: 'minigun', desc: 'Auto-turret. Sprays 20 rounds at enemies over 2s, then cools down for 30s.' },
+    61:  { icon: 'minigun', desc: 'Overdriven reactor. Mini-Gun cooldown drops to 20s.' },
     4:   { icon: 'shield',  desc: 'Energy barrier. Absorbs a hit, then shatters into shrapnel.' },
     41:  { icon: 'shatter', desc: 'Reinforced barrier that absorbs 5 hits before shattering.' },
     100: { icon: 'nuke',    desc: 'Refill every nuke. Requires 3 arming codes.' }
@@ -1581,7 +1587,8 @@ function getUpgradeTiles(p) {
         { icon: 'spread', on: p.hasSpreadBlaster, name: 'Spread Blaster x5' },
         { icon: p.hasOchoMissiles ? 'ocho' : 'rocket', on: p.hasRockets, lvl: p.hasRockets ? String(p.maxMissiles) : '', name: p.hasOchoMissiles ? 'Missiles 8: The Ocho' : 'Quad-Rockets' },
         { icon: 'reload', on: p.hasDoubleMissileSpeed, name: 'Double Missile Reload Speed' },
-        { icon: 'charge', on: p.chargedShotLevel > 0, lvl: p.chargedShotLevel > 0 ? 'L' + p.chargedShotLevel : '', name: 'Charged Shot' },
+        { icon: p.chargedShotLevel >= GAMMA_SHOT_LEVEL ? 'gamma' : 'charge', on: p.chargedShotLevel > 0, lvl: p.chargedShotLevel > 0 ? 'L' + p.chargedShotLevel : '', name: p.chargedShotLevel >= GAMMA_SHOT_LEVEL ? 'Gamma Shot' : 'Charged Shot' },
+        { icon: 'minigun', on: p.hasMiniGun, lvl: p.hasMiniGunReactor ? 'R' : '', name: p.hasMiniGunReactor ? 'Mini-Gun Reactor' : 'Mini-Gun' },
         { icon: 'nuke', on: p.hasNuclearWeapon, lvl: p.hasNuclearWeapon ? String(p.maxNukes) : '', name: 'Nuclear Bomb' },
         { icon: 'cluster', on: p.hasClusterNukes, name: 'Cluster Nukes' },
         { icon: p.shatterShieldLevel > 0 ? 'shatter' : 'shield', on: p.hasPowerShield, lvl: p.hasPowerShield ? String(shieldHits + 1 - p.powerShieldHits) : '', name: p.shatterShieldLevel > 0 ? 'Shatter Shield x5' : 'Power Shield' }
@@ -2334,8 +2341,8 @@ function paintShooter() {
         metalPlate(g, [11.2, 16.2, 20.8, 16.2, 19.2, 19, 12.8, 19]);
         [[12.6, 23.5], [14.9, 21.5], [17.1, 21.5], [19.4, 23.5]].forEach(([x, tip]) => bone(g, [x - 0.9, 18.6, x, tip, x + 0.9, 18.6]));
         applyLighting(g, w, h, 0.4);
-        evilEye(g, 9.2, 11.2, 7, 3, '#f4ff3a', false);
-        evilEye(g, 22.8, 11.2, 7, 3, '#f4ff3a', true);
+        evilEye(g, 9.2, 11.2, 7, 3, '#c04dff', false);
+        evilEye(g, 22.8, 11.2, 7, 3, '#c04dff', true);
         glowDot(g, 16, 18, 3, '#9dff48', 0.6);
     }), '#7dff3a', 2.5);
 }
@@ -2419,7 +2426,7 @@ function paintFatty() {
 // Eye positions (sprite space) and colours, pulsed with an extra glow in game
 const ENEMY_EYES = {
     charger: { color: '#ff4fa8', size: 32, eyes: [[16, 15]] },
-    shooter: { color: '#f4ff3a', size: 32, eyes: [[9.2, 11.6], [22.8, 11.6]] },
+    shooter: { color: '#c04dff', size: 32, eyes: [[9.2, 11.6], [22.8, 11.6]] },
     bugger:  { color: '#ff3a3a', size: 32, eyes: [[10, 14], [22, 14]] },
     fatty:   { color: '#ffb020', size: 64, eyes: [[21.5, 24.6], [42.5, 24.6]] }
 };
@@ -2500,18 +2507,44 @@ function paintNukeCanister() {
     });
 }
 
-// Nuke in flight: warhead missile, nose up
+// Nuke missile: stubby olive-green mini-nuke (Fallout style) - bulbous teardrop body, hazard band, ring tail fin
 function paintNukeMissile() {
     return paint(32, 32, (g, w, h) => {
-        const fin = [13, 19, 7.5, 28, 13, 26];
-        [fin, mirrorX(fin, w)].forEach(pts => { poly(g, pts); g.fillStyle = plateGrad(g, 19, 28); g.fill(); g.strokeStyle = '#0b0f14'; g.lineWidth = 0.5; g.stroke(); });
-        roundRect(g, 13, 8, 6, 20, 1.5); g.fillStyle = linGrad(g, 13, 0, 19, 0, [[0, '#6b737c'], [0.35, '#f2f4f6'], [1, '#4a525b']]); g.fill();
-        g.strokeStyle = '#0b0f14'; g.lineWidth = 0.6; g.stroke();
-        poly(g, [13, 10, 16, 1.5, 19, 10]); g.fillStyle = linGrad(g, 13, 0, 19, 0, [[0, '#7a1a0c'], [0.4, '#ff6a3a'], [1, '#5a1008']]); g.fill();
-        g.fillStyle = '#f2c230'; g.fillRect(13, 13, 6, 3);
-        g.fillStyle = '#16120a'; for (let x = 13; x < 19; x += 2) g.fillRect(x, 13, 1, 3);
-        g.fillStyle = '#20262d'; g.fillRect(14, 27.5, 4, 2);
-        applyLighting(g, w, h, 0.7);
+        const olive = (x0, x1) => linGrad(g, x0, 0, x1, 0, [[0, '#18240a'], [0.3, '#a6d45a'], [0.55, '#6c9a30'], [0.85, '#2c4212'], [1, '#141e08']]);
+        // Tail fins inside a ring shroud
+        const fin = [13, 20, 8.6, 27, 13, 27];
+        [fin, mirrorX(fin, w)].forEach(pts => { poly(g, pts); g.fillStyle = linGrad(g, 0, 20, 0, 27, [[0, '#6f9a36'], [1, '#26380e']]); g.fill(); g.strokeStyle = '#0b1206'; g.lineWidth = 0.5; g.stroke(); });
+        poly(g, [11.6, 19, 20.4, 19, 18.4, 27.5, 13.6, 27.5]); g.fillStyle = olive(11.6, 20.4); g.fill();
+        g.strokeStyle = '#0b1206'; g.lineWidth = 0.5; g.stroke();
+        roundRect(g, 7.6, 26, 16.8, 3.4, 1.4); g.fillStyle = olive(7.6, 24.4); g.fill();
+        g.strokeStyle = '#0b1206'; g.lineWidth = 0.55; g.stroke();
+        line(g, 8.4, 26.7, 23.6, 26.7, 'rgba(220,255,160,0.35)', 0.35);
+        // Bulbous teardrop body, widest just behind the round nose
+        const body = () => {
+            g.beginPath(); g.moveTo(16, 2.2);
+            g.bezierCurveTo(23.5, 2.2, 25.2, 10, 24, 15.5);
+            g.bezierCurveTo(23, 20, 19.5, 22, 16, 22);
+            g.bezierCurveTo(12.5, 22, 9, 20, 8, 15.5);
+            g.bezierCurveTo(6.8, 10, 8.5, 2.2, 16, 2.2); g.closePath();
+        };
+        body(); g.fillStyle = olive(7, 25); g.fill();
+        g.save(); body(); g.clip();
+        // Dark nose cap
+        g.fillStyle = 'rgba(10,20,4,0.55)'; g.fillRect(0, 0, w, 5.2);
+        line(g, 7, 5.2, 25, 5.2, 'rgba(10,18,4,0.9)', 0.5);
+        // Yellow hazard band with black stripes
+        g.fillStyle = '#f2c230'; g.fillRect(0, 11.2, w, 3);
+        g.fillStyle = '#16120a';
+        for (let x = 6; x < 26; x += 2.6) { poly(g, [x, 14.2, x + 1.1, 14.2, x + 2.3, 11.2, x + 1.2, 11.2]); g.fill(); }
+        // Rear seam with rivets
+        line(g, 7, 18.4, 25, 18.4, 'rgba(10,18,4,0.9)', 0.55);
+        [[11, 19.6], [16, 20], [21, 19.6]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 0.45, 0, Math.PI * 2); g.fillStyle = '#c8e890'; g.fill(); });
+        // Glossy highlight
+        ellipse(g, 12.2, 8.5, 1.3, 3.6, -0.25); g.fillStyle = 'rgba(240,255,210,0.45)'; g.fill();
+        g.restore();
+        body(); g.strokeStyle = '#0b1206'; g.lineWidth = 0.6; g.stroke();
+        glowDot(g, 16, 8.4, 2.4, '#9dff48', 0.55);
+        applyLighting(g, w, h, 0.6);
     });
 }
 
@@ -2634,8 +2667,12 @@ const PLAYER_START_Y = HEIGHT - 70;
 // Charged Shot: stop firing to charge a beam that bursts into a 5x-damage energy nova.
 // Level 1: single beam, 2s charge. Level 2: 2 beams in a 15 degree spread.
 // Level 3: 3 beams (one straight, two angled 15 degrees out) and a faster 1.5s charge.
-const CHARGE_TIME_NORMAL = 2000;
-const CHARGE_TIME_FAST = 1500;
+const CHARGE_SPEEDUP = 1.2; // Every Charged Shot level charges 20% faster
+const CHARGE_TIME_NORMAL = 2000 / CHARGE_SPEEDUP;
+const CHARGE_TIME_FAST = 1500 / CHARGE_SPEEDUP;
+const CHARGED_BEAMS = [0, 1, 2, 3, 5, 5]; // Beams per charged shot at each Charged Shot level
+const GAMMA_SHOT_LEVEL = 5; // Charged Shot level that fires violet Gamma beams
+const GAMMA_COLOR = '#b44dff';
 const CHARGED_SHOT_DAMAGE = 5;
 const CHARGED_SPREAD = 15 * Math.PI / 180; // angle between beams in a charged spread
 const CHARGED_BEAM_SPEED = 0.6;
@@ -2667,8 +2704,8 @@ function getTintedSprite(img, color) {
 
 function initPlayers() {
     return [
-        { x: WIDTH * 0.25, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, hasCollectedFirstPowerUp: false },
-        { x: WIDTH * 0.75, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, hasCollectedFirstPowerUp: false }
+        { x: WIDTH * 0.25, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, hasMiniGun: false, hasMiniGunReactor: false, miniGunCooldown: 0, miniGunFiring: false, miniGunShotsLeft: 0, miniGunShotTimer: 0, miniGunSound: null, hasCollectedFirstPowerUp: false },
+        { x: WIDTH * 0.75, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, hasMiniGun: false, hasMiniGunReactor: false, miniGunCooldown: 0, miniGunFiring: false, miniGunShotsLeft: 0, miniGunShotTimer: 0, miniGunSound: null, hasCollectedFirstPowerUp: false }
     ];
 }
 const players = initPlayers();
@@ -3146,6 +3183,52 @@ const sfx = {
             osc.start(t); osc.stop(t + 0.25);
         });
     },
+    miniGun: (duration) => {
+        // Rotary cannon: barrel-spin whine plus a rapid rattle of shots that speeds up as it spins up.
+        // Returns a handle so a burst cut short can be silenced.
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        const t = audioCtx.currentTime, end = t + duration;
+        const out = audioCtx.createGain(); out.connect(audioCtx.destination);
+        out.gain.setValueAtTime(0.0001, t);
+        out.gain.linearRampToValueAtTime(1, t + 0.12);
+        out.gain.setValueAtTime(1, end - 0.1);
+        out.gain.linearRampToValueAtTime(0.0001, end + 0.25);
+        const nodes = [];
+        // Shots: bandpassed noise chopped by a square-wave gate
+        const buf = audioCtx.createBuffer(1, Math.ceil(audioCtx.sampleRate * (duration + 0.3)), audioCtx.sampleRate);
+        const data = buf.getChannelData(0); for(let i=0; i<data.length; i++) data[i] = Math.random() * 2 - 1;
+        const noise = audioCtx.createBufferSource(); noise.buffer = buf;
+        const band = audioCtx.createBiquadFilter(); band.type = 'bandpass'; band.frequency.value = 1600; band.Q.value = 0.7;
+        const gate = audioCtx.createGain(); gate.gain.value = 0.05;
+        const lfo = audioCtx.createOscillator(); lfo.type = 'square';
+        lfo.frequency.setValueAtTime(14, t); lfo.frequency.exponentialRampToValueAtTime(42, t + 0.35);
+        const lfoDepth = audioCtx.createGain(); lfoDepth.gain.value = 0.05;
+        lfo.connect(lfoDepth); lfoDepth.connect(gate.gain);
+        noise.connect(band); band.connect(gate); gate.connect(out);
+        // Low thump under each shot
+        const thump = audioCtx.createOscillator(); thump.type = 'square';
+        thump.frequency.setValueAtTime(14, t); thump.frequency.exponentialRampToValueAtTime(42, t + 0.35);
+        const thumpFilter = audioCtx.createBiquadFilter(); thumpFilter.type = 'lowpass'; thumpFilter.frequency.value = 220;
+        const thumpGain = audioCtx.createGain(); thumpGain.gain.value = 0.06;
+        thump.connect(thumpFilter); thumpFilter.connect(thumpGain); thumpGain.connect(out);
+        // Spinning barrels: whine that winds up, then winds down after the burst
+        const whine = audioCtx.createOscillator(); whine.type = 'sawtooth';
+        whine.frequency.setValueAtTime(90, t); whine.frequency.exponentialRampToValueAtTime(320, t + 0.4);
+        whine.frequency.setValueAtTime(320, end); whine.frequency.exponentialRampToValueAtTime(120, end + 0.3);
+        const whineFilter = audioCtx.createBiquadFilter(); whineFilter.type = 'lowpass'; whineFilter.frequency.value = 900;
+        const whineGain = audioCtx.createGain(); whineGain.gain.value = 0.012;
+        whine.connect(whineFilter); whineFilter.connect(whineGain); whineGain.connect(out);
+        [noise, lfo, thump, whine].forEach(n => { n.start(t); n.stop(end + 0.3); nodes.push(n); });
+        return {
+            stop: () => {
+                const now = audioCtx.currentTime;
+                out.gain.cancelScheduledValues(now);
+                out.gain.setValueAtTime(out.gain.value, now);
+                out.gain.linearRampToValueAtTime(0.0001, now + 0.15);
+                nodes.forEach(n => { try { n.stop(now + 0.2); } catch (e) {} });
+            }
+        };
+    },
     rocketLaunch: () => {
         if(audioCtx.state === 'suspended') audioCtx.resume();
         const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
@@ -3299,7 +3382,8 @@ function destroyRandomWeapon(p, pIdx) {
         let shieldName = p.shatterShieldLevel > 0 ? "Shatter Shield x5" : "Power Shield";
         weapons.push({ name: shieldName, destroy: () => { p.hasPowerShield = false; p.powerShieldHits = 0; p.shatterShieldLevel = 0; } });
     }
-    if (p.chargedShotLevel > 0) weapons.push({ name: "Charged Shot", destroy: () => { p.chargedShotLevel = 0; p.chargeTimer = 0; } });
+    if (p.chargedShotLevel > 0) weapons.push({ name: p.chargedShotLevel >= GAMMA_SHOT_LEVEL ? "Gamma Shot" : "Charged Shot", destroy: () => { p.chargedShotLevel = 0; p.chargeTimer = 0; } });
+    if (p.hasMiniGun) weapons.push({ name: "Mini-Gun", destroy: () => { endMiniGunBurst(p); p.hasMiniGun = false; p.hasMiniGunReactor = false; p.miniGunCooldown = 0; } });
 
     if (weapons.length > 0) {
         let chosen = weapons[Math.floor(Math.random() * weapons.length)];
@@ -3328,6 +3412,10 @@ function countUpgrades(p) {
     if (p.chargedShotLevel >= 1) count++;
     if (p.chargedShotLevel >= 2) count++;
     if (p.chargedShotLevel >= 3) count++;
+    if (p.chargedShotLevel >= 4) count++;
+    if (p.chargedShotLevel >= 5) count++;
+    if (p.hasMiniGun) count++;
+    if (p.hasMiniGunReactor) count++;
     return count;
 }
 
@@ -3361,7 +3449,7 @@ function getShipsPerMinBoost() {
 
 // Calculate power up drop rate multiplier based on upgrades
 // Goes from 1.0 (0 upgrades) to 0.05 (all upgrades)
-const MAX_UPGRADES = 16; // Total possible upgrades
+const MAX_UPGRADES = 20; // Total possible upgrades
 function getDropRateMultiplier() {
     // Get the max upgrades across all players
     let maxUpgrades = 0;
@@ -3600,8 +3688,17 @@ window.selectWeapon = function(playerIndex, weaponId) {
     else if (weaponId === 4) {
         textLines = ["Shield generator calibration required...", "Enter the frequency harmonics."];
     }
-    else if (weaponId === 5 || weaponId === 51 || weaponId === 52) {
+    else if (weaponId === 5 || weaponId === 51 || weaponId === 52 || weaponId === 53) {
         textLines = ["Charge capacitors require precise", "energy calculations."];
+    }
+    else if (weaponId === 54) {
+        textLines = ["Gamma emitters are unstable!", "Calculate the containment field."];
+    }
+    else if (weaponId === 6) {
+        textLines = ["The Mini-Gun's targeting computer", "needs calibrating. Run the numbers."];
+    }
+    else if (weaponId === 61) {
+        textLines = ["Balance the reactor output to", "spin the barrels up faster."];
     }
     else if (weaponId === 11) { 
         textLines = ["Triple blaster alignment needed.", "Calculate the power distribution."]; 
@@ -3696,10 +3793,16 @@ function finalizeUpgrade(success) {
             weaponName = "Cluster Nukes";
         }
         
-        // Charged Shot: 5=unlock, 51=double shot, 52=triple shot + 1.5s charge
+        // Charged Shot: 5=unlock, 51=double shot, 52=triple shot + faster charge, 53=5 shots, 54=Gamma Shot
         else if (wId === 5) { p.chargedShotLevel = 1; p.chargeTimer = 0; weaponName = "Charged Shot"; }
         else if (wId === 51) { p.chargedShotLevel = 2; weaponName = "Double Charged Shot"; }
         else if (wId === 52) { p.chargedShotLevel = 3; weaponName = "Triple Charged Shot"; }
+        else if (wId === 53) { p.chargedShotLevel = 4; weaponName = "Charged Shot x5"; }
+        else if (wId === 54) { p.chargedShotLevel = GAMMA_SHOT_LEVEL; weaponName = "Gamma Shot"; }
+
+        // Mini-Gun: 6=unlock (30s cooldown), 61=Mini-Gun Reactor (20s cooldown)
+        else if (wId === 6) { p.hasMiniGun = true; p.miniGunCooldown = 0; weaponName = "Mini-Gun"; }
+        else if (wId === 61) { p.hasMiniGunReactor = true; p.miniGunCooldown = Math.min(p.miniGunCooldown, MINIGUN_REACTOR_COOLDOWN); weaponName = "Mini-Gun Reactor"; }
 
         // Power Shield
         else if (wId === 4) {
@@ -3827,7 +3930,18 @@ function updateWeaponMenuButtons() {
         } else if (p.chargedShotLevel === 1) {
             add(51, 'Double Charged Shot');
         } else if (p.chargedShotLevel === 2) {
-            add(52, 'Triple Charge (1.5s)');
+            add(52, 'Triple Charge (1.25s)');
+        } else if (p.chargedShotLevel === 3) {
+            add(53, 'Charged Shot x5');
+        } else if (p.chargedShotLevel === 4) {
+            add(54, 'Gamma Shot', 'elite');
+        }
+
+        // Mini-Gun upgrades
+        if (!p.hasMiniGun) {
+            add(6, 'Mini-Gun');
+        } else if (!p.hasMiniGunReactor) {
+            add(61, 'Mini-Gun Reactor');
         }
 
         // Power Shield upgrades
@@ -3850,7 +3964,61 @@ function updateWeaponMenuButtons() {
 // Energy beam that bursts into a nova on impact; angle is radians from straight up
 function fireChargedBeam(p, owner, angle) {
     pBullets.push({ x: p.x + p.w/2 - 6, y: p.y - 24, w: 12, h: 48, owner: owner, charged: true, angle: angle,
+                    gamma: p.chargedShotLevel >= GAMMA_SHOT_LEVEL,
                     vx: Math.sin(angle) * CHARGED_BEAM_SPEED, vy: -Math.cos(angle) * CHARGED_BEAM_SPEED });
+}
+
+// --- MINI-GUN ---
+// Auto-turret: once its cooldown is over and enemies are on screen, it sprays a burst of
+// inaccurate rounds, each aimed (not homing) at the nearest enemy
+const MINIGUN_SHOTS = 20;
+const MINIGUN_BURST_TIME = 2000;
+const MINIGUN_COOLDOWN = 30000;
+const MINIGUN_REACTOR_COOLDOWN = 20000;
+const MINIGUN_AIM_VARIATION = 10 * Math.PI / 180; // each round strays up to 10 degrees either way
+const MINIGUN_BULLET_SPEED = 0.7;
+
+function nearestEnemyOnScreen(x, y) {
+    let best = null, bestDist = Infinity;
+    enemies.forEach(e => {
+        if (!enemyInPlayArea(e)) return;
+        const d = Math.hypot(e.x + e.w/2 - x, e.y + e.h/2 - y);
+        if (d < bestDist) { bestDist = d; best = e; }
+    });
+    return best;
+}
+
+function endMiniGunBurst(p) {
+    if (!p.miniGunFiring) return;
+    p.miniGunFiring = false;
+    p.miniGunShotsLeft = 0;
+    p.miniGunCooldown = p.hasMiniGunReactor ? MINIGUN_REACTOR_COOLDOWN : MINIGUN_COOLDOWN;
+    if (p.miniGunSound) { p.miniGunSound.stop(); p.miniGunSound = null; }
+}
+
+function updateMiniGun(p, owner, dt) {
+    const gx = p.x + p.w/2, gy = p.y + 12;
+    if (p.miniGunFiring) {
+        p.miniGunShotTimer -= dt;
+        while (p.miniGunShotsLeft > 0 && p.miniGunShotTimer <= 0) {
+            const target = nearestEnemyOnScreen(gx, gy);
+            if (!target) { endMiniGunBurst(p); return; } // Burst stops once the screen is clear
+            const angle = Math.atan2(target.y + target.h/2 - gy, target.x + target.w/2 - gx) + (Math.random() * 2 - 1) * MINIGUN_AIM_VARIATION;
+            pBullets.push({ x: gx - 3, y: gy - 3, w: 6, h: 6, owner: owner, mini: true,
+                            vx: Math.cos(angle) * MINIGUN_BULLET_SPEED, vy: Math.sin(angle) * MINIGUN_BULLET_SPEED });
+            p.miniGunShotsLeft--;
+            p.miniGunShotTimer += MINIGUN_BURST_TIME / MINIGUN_SHOTS;
+        }
+        if (p.miniGunShotsLeft === 0) endMiniGunBurst(p);
+        return;
+    }
+    if (p.miniGunCooldown > 0) { p.miniGunCooldown -= dt; return; }
+    if (nearestEnemyOnScreen(gx, gy)) {
+        p.miniGunFiring = true;
+        p.miniGunShotsLeft = MINIGUN_SHOTS;
+        p.miniGunShotTimer = 0;
+        p.miniGunSound = sfx.miniGun(MINIGUN_BURST_TIME / 1000);
+    }
 }
 
 function fireBlaster(p, owner) {
@@ -3858,7 +4026,7 @@ function fireBlaster(p, owner) {
 
     if (isChargeReady(p)) {
         // Fire every beam at once, fanned out CHARGED_SPREAD apart and centred on straight up
-        const beams = p.chargedShotLevel;
+        const beams = CHARGED_BEAMS[p.chargedShotLevel];
         for (let k = 0; k < beams; k++) fireChargedBeam(p, owner, (k - (beams - 1) / 2) * CHARGED_SPREAD);
         sfx.shoot(1600);
         p.chargeTimer = 0;
@@ -4042,12 +4210,16 @@ function killEnemyWithDrops(e, i) {
     enemies.splice(i, 1);
 }
 
-function detonateChargedNova(x, y) {
-    novas.push({ x: x, y: y, age: 0 });
-    sfx.nova();
+let lastNovaSoundTime = 0;
+function detonateChargedNova(x, y, gamma = false) {
+    novas.push({ x: x, y: y, age: 0, gamma: gamma });
+    // A gamma beam can set off several novas at once; play one sound for the group
+    const now = performance.now();
+    if (now - lastNovaSoundTime > 60) { sfx.nova(); lastNovaSoundTime = now; }
+    const colors = gamma ? [GAMMA_COLOR, '#d9a6ff', '#ffffff'] : ['#33bbff', '#88ddff', '#ffffff'];
     for (let k = 0; k < 24; k++) {
         let a = (k / 24) * Math.PI * 2, spd = 3 + Math.random() * 2;
-        particles.push({ x: x, y: y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life: 0.8, color: ['#33bbff', '#88ddff', '#ffffff'][k % 3], size: 3 + Math.random() * 3 });
+        particles.push({ x: x, y: y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life: 0.8, color: colors[k % 3], size: 3 + Math.random() * 3 });
     }
     for (let i = enemies.length - 1; i >= 0; i--) {
         let e = enemies[i];
@@ -4199,6 +4371,7 @@ function update(dt) {
     SWARM.dropTimer += dt; if(SWARM.dropTimer > 10000) { let currentBottomY = SWARM.yBase + (lowestRow * 40); if (currentBottomY < (players[0].y - 160)) { SWARM.yBase += 40; } SWARM.dropTimer = 0; }
 
     players.forEach((p, i) => {
+        if (p.state !== 'active' || p.dead) endMiniGunBurst(p);
         if(p.dead) return;
         // Gradual missile reload: 1 missile every 2s (2 with Double Reload Speed)
         if (p.hasRockets && p.currentMissiles < p.maxMissiles) {
@@ -4214,6 +4387,7 @@ function update(dt) {
         if (p.state === 'entering') { p.y -= 0.3 * dt; if (p.y <= p.startY) { p.y = p.startY; p.state = 'active'; p.shieldTimer = 3000; } return; }
         if (p.shieldTimer > 0) p.shieldTimer -= dt;
         if (p.chargedShotLevel > 0) p.chargeTimer += dt;
+        if (p.hasMiniGun) updateMiniGun(p, i, dt);
         // Player 1 Controls
         if(i===0) {
             if (p1ControlType === 'keyboard') {
@@ -4529,11 +4703,19 @@ function update(dt) {
         for(let bIdx=pBullets.length-1; bIdx>=0; bIdx--) {
             let b = pBullets[bIdx];
             if(rectIntersect(e, b)) {
+                if (b.charged && b.gamma && e.type !== 'fatty') {
+                    // Gamma beam passes through basic enemies, exploding at each one it touches
+                    if (!b.hits) b.hits = new Set();
+                    if (b.hits.has(e)) continue;
+                    b.hits.add(e);
+                    pendingNovas.push({ x: e.x + e.w/2, y: e.y + e.h/2, gamma: true });
+                    continue;
+                }
                 pBullets.splice(bIdx, 1);
                 if (b.charged) {
                     // Charged shot bursts into a nova; its damage is applied after this loop
                     const a = b.angle || 0; // nova at the beam's tip
-                    pendingNovas.push({ x: b.x + b.w/2 + Math.sin(a) * b.h/2, y: b.y + b.h/2 - Math.cos(a) * b.h/2 });
+                    pendingNovas.push({ x: b.x + b.w/2 + Math.sin(a) * b.h/2, y: b.y + b.h/2 - Math.cos(a) * b.h/2, gamma: b.gamma });
                     break;
                 }
                 e.hp--;
@@ -4568,7 +4750,7 @@ function update(dt) {
     }
 
     // Charged shot novas damage every enemy caught in the blast
-    pendingNovas.forEach(n => detonateChargedNova(n.x, n.y));
+    pendingNovas.forEach(n => detonateChargedNova(n.x, n.y, n.gamma));
     pendingNovas.length = 0;
 
     for(let i=capsules.length-1; i>=0; i--) {
@@ -4726,7 +4908,7 @@ function draw() {
         ctx.drawImage(assets['p'+(i+1)], p.x, p.y, p.w, p.h);
         // Invulnerability after respawning: flickering energy bubble
         if(p.shieldTimer > 0) { ctx.save(); ctx.globalAlpha = 0.45 + 0.25 * Math.sin(animFrame * 0.4); ctx.drawImage(assets.shield, p.x - 10, p.y - 10, p.w + 20, p.h + 20); ctx.restore(); }
-        if(isChargeReady(p)) { ctx.save(); ctx.globalAlpha = 0.25 + 0.45 * Math.abs(Math.sin(animFrame * 0.15)); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(getTintedSprite(assets['p'+(i+1)], '#00aaff'), p.x, p.y, p.w, p.h); ctx.restore(); }
+        if(isChargeReady(p)) { ctx.save(); ctx.globalAlpha = 0.25 + 0.45 * Math.abs(Math.sin(animFrame * 0.15)); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(getTintedSprite(assets['p'+(i+1)], p.chargedShotLevel >= GAMMA_SHOT_LEVEL ? GAMMA_COLOR : '#00aaff'), p.x, p.y, p.w, p.h); ctx.restore(); }
         if(p.hasPowerShield) { ctx.save(); let shieldImg = (p.powerShieldHits > 0 && assets.shield_hit) ? assets.shield_hit : assets.shield; ctx.globalAlpha = 0.85; ctx.drawImage(shieldImg, p.x - 8, p.y - 8, p.w + 16, p.h + 16); ctx.restore(); }
     });
     rockets.forEach(r => { 
@@ -4746,7 +4928,7 @@ function draw() {
         ctx.translate(n.x + n.w/2, n.y + n.h/2);
         ctx.rotate(n.rotation);
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
-        ctx.drawImage(getGlowSprite('#ff7a2a'), -8, n.h/2 - 8, 16, 26 + Math.random() * 8);
+        ctx.drawImage(getGlowSprite('#9dff48'), -8, n.h/2 - 8, 16, 26 + Math.random() * 8);
         ctx.restore();
         ctx.drawImage(assets.nuke_missile, -n.w/2, -n.h/2, n.w, n.h);
         ctx.restore();
@@ -4758,7 +4940,7 @@ function draw() {
         ctx.translate(mn.x, mn.y);
         ctx.rotate(mn.rotation);
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
-        ctx.drawImage(getGlowSprite('#ff7a2a'), -4, 4, 8, 14);
+        ctx.drawImage(getGlowSprite('#9dff48'), -4, 4, 8, 14);
         ctx.restore();
         ctx.drawImage(assets.nuke_missile, -8, -8, 16, 16); // 50% of normal size (32 -> 16)
         ctx.restore();
@@ -4789,19 +4971,19 @@ function draw() {
         }
     });
     
-    // Draw charged shot novas: blue core flash with an expanding ring
+    // Draw charged shot novas: blue (violet for Gamma) core flash with an expanding ring
     novas.forEach(n => {
         let t = n.age / 400, r = CHARGED_NOVA_RADIUS * Math.min(1, n.age / 150);
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         let core = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
         core.addColorStop(0, `rgba(255,255,255,${0.9 * (1 - t)})`);
-        core.addColorStop(0.4, `rgba(60,170,255,${0.6 * (1 - t)})`);
-        core.addColorStop(1, 'rgba(0,80,255,0)');
+        core.addColorStop(0.4, n.gamma ? `rgba(180,77,255,${0.65 * (1 - t)})` : `rgba(60,170,255,${0.6 * (1 - t)})`);
+        core.addColorStop(1, n.gamma ? 'rgba(120,0,255,0)' : 'rgba(0,80,255,0)');
         ctx.fillStyle = core;
         ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = `rgba(140,220,255,${1 - t})`; ctx.lineWidth = 4;
-        ctx.shadowColor = '#33bbff'; ctx.shadowBlur = 16;
+        ctx.strokeStyle = n.gamma ? `rgba(220,170,255,${1 - t})` : `rgba(140,220,255,${1 - t})`; ctx.lineWidth = 4;
+        ctx.shadowColor = n.gamma ? GAMMA_COLOR : '#33bbff'; ctx.shadowBlur = 16;
         ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.stroke();
         ctx.restore();
     });
@@ -4870,10 +5052,20 @@ function draw() {
             ctx.save();
             ctx.translate(b.x + b.w/2, b.y + b.h/2);
             ctx.rotate(b.angle || 0);
-            ctx.drawImage(getGlowSprite('#33bbff'), -b.w/2 - 10, -b.h/2 - 8, b.w + 20, b.h + 16);
-            ctx.fillStyle = linGrad(ctx, -b.w/2, 0, b.w/2, 0, [[0, 'rgba(40,140,255,0)'], [0.5, '#e8f8ff'], [1, 'rgba(40,140,255,0)']]);
+            if (b.gamma) {
+                // Gamma beam: brighter, wider violet lance
+                ctx.drawImage(getGlowSprite(GAMMA_COLOR), -b.w/2 - 16, -b.h/2 - 12, b.w + 32, b.h + 24);
+                ctx.drawImage(getGlowSprite(GAMMA_COLOR), -b.w/2 - 6, -b.h/2 - 4, b.w + 12, b.h + 8);
+                ctx.fillStyle = linGrad(ctx, -b.w/2, 0, b.w/2, 0, [[0, 'rgba(160,40,255,0)'], [0.5, '#f6e8ff'], [1, 'rgba(160,40,255,0)']]);
+            } else {
+                ctx.drawImage(getGlowSprite('#33bbff'), -b.w/2 - 10, -b.h/2 - 8, b.w + 20, b.h + 16);
+                ctx.fillStyle = linGrad(ctx, -b.w/2, 0, b.w/2, 0, [[0, 'rgba(40,140,255,0)'], [0.5, '#e8f8ff'], [1, 'rgba(40,140,255,0)']]);
+            }
             ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
             ctx.restore();
+        } else if (b.mini) {
+            // Mini-Gun round: small glowing green dot
+            ctx.drawImage(getGlowSprite('#4dff5a'), b.x - 5, b.y - 5, b.w + 10, b.h + 10);
         } else {
             ctx.drawImage(assets.bullet, b.x, b.y, b.w, b.h);
         }
