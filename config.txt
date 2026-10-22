@@ -9,7 +9,7 @@
 
 [Shooters]
 <speed 80%>
-<PowerDropChance 15%>
+<PowerDropChance 25%>
 <NukeDropChance 1%>
 
 [Chargers]
