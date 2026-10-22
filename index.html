@@ -2567,7 +2567,7 @@ const shockwaves = []; // For nuke shockwave effects
 const shieldFragments = []; // For power shield shatter fragments
 const miniNukes = []; // For cluster nuke mini nukes
 const novas = []; // Charged shot energy nova effects
-const MAX_PARTICLES = 600; // safety cap for extreme pile-ups (e.g. several nukes); normal play stays well below it
+const MAX_PARTICLES = 450; // most particles on screen at once; the oldest are dropped first
 const pendingNovas = []; // Charged shot impacts, detonated after the enemy update loop
 
 // Nuke explosion radius (reduced from screen-wide)
@@ -4490,7 +4490,6 @@ function update(dt) {
 
     if(players[0].dead && players[1].dead && !continueChallenge.active) { if(!gameOver) { let best = Math.max(p1Power, p2Power); if(best > highPower) { highPower = best; localStorage.setItem('galago_high_power', highPower); } } gameOver = true; }
     for(let i=particles.length-1; i>=0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05; if(p.life <= 0) particles.splice(i, 1); }
-    if (particles.length > MAX_PARTICLES) particles.splice(0, particles.length - MAX_PARTICLES); // drop the oldest
     updateBullets(pBullets, -0.6, dt); 
     for(let i=eBullets.length-1; i>=0; i--) { let b = eBullets[i]; b.x += b.vx || 0; b.y += b.vy; if (b.type === 'rocket') { if (Math.random() < 0.3) particles.push({ x: b.x+12, y: b.y, vx: (Math.random()-0.5), vy: -1, life: 0.5, color: '#aaa', size: 3 }); } if(b.y > HEIGHT || b.x < 0 || b.x > WIDTH) eBullets.splice(i, 1); }
     for(let bIdx=eBullets.length-1; bIdx>=0; bIdx--) {
@@ -4534,6 +4533,8 @@ function draw() {
         drawBanner("DEFEAT", "ALL PILOTS DOWN  //  BEST REACTOR POWER " + highPower + "%", '#ff3b2f', HEIGHT/2, 1, 72);
         return;
     }
+    // Never more than MAX_PARTICLES on screen: drop the oldest first
+    if (particles.length > MAX_PARTICLES) particles.splice(0, particles.length - MAX_PARTICLES);
     // Smoke first, then additive glowing debris
     particles.forEach(p => {
         if (!p.smoke) return;
