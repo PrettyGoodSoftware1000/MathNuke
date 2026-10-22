@@ -1207,6 +1207,115 @@
     </div>
 
 
+<!-- Built-in copy of config.txt. Browsers block reading config.txt when index.html is opened
+     straight from disk (file://), so the game falls back to this copy (keep it in sync with config.txt). -->
+<script type="text/plain" id="bundledConfig">
+[Lives] <5>
+[EnergyCapsuleSpeed 8%]
+
+[PowerUpValve] <50%>
+[NukeSpeed] <15%>
+
+[Level 0] <LevelStart 0:00>
+[ShipsPerMin 45]
+
+[Shooters]
+<speed 80%>
+<PowerDropChance 25%>
+<NukeDropChance 1%>
+
+[Chargers]
+<speed 70%>
+<commonness 20%>
+<PowerDropChance 100%>
+<NukeDropChance 0%>
+
+[Fatties]
+<speed 50%>
+<commonness 0%>
+<PowerDropChance 50%>
+<NukeDropChance 100%>
+
+[Buggers]
+<speed 65%>
+<commonness 0%>
+<PowerDropChance 25%>
+<NukeDropChance 50%>
+
+[Level 1] <LevelStart 0:00>
+[ShipsPerMin 55]
+
+
+
+
+[Event]{
+[0:15]
+[Chargers] <Count 5>
+}
+
+[Event]{
+[0:35]
+[Buggers] <Count 2>
+}
+
+[Event]{
+[0:50]
+[Buggers] <Count 3>
+}
+
+
+[Level 2] <LevelStart 1:00>
+[ShipsPerMin 70]
+
+[Shooters]
+<speed 60%>
+<PowerDropChance 3%>
+<NukeDropChance 1%>
+
+[Chargers]
+<speed 100%>
+<commonness 10%>
+<PowerDropChance 100%>
+<NukeDropChance 0%>
+
+[Fatties]
+<speed 50%>
+<commonness 0%>
+<PowerDropChance 50%>
+<NukeDropChance 50%>
+
+[Buggers]
+<speed 65%>
+<commonness 15%>
+<PowerDropChance 15%>
+<NukeDropChance 10%>
+
+
+
+[Event]{
+[1:59]
+[Fatties] <Count 2>
+}
+
+
+[Level 3] <LevelStart 2:00>
+[ShipsPerMin 90]
+
+[Event]{
+[2:10]
+[Buggers] <Count 10>
+}
+
+
+[Level 4] <LevelStart 3:00>
+[ShipsPerMin 125]
+
+[Event]{
+[3:05]
+[Fatties] <Count 10>
+}
+</script>
+
 <script>
 // --- PLAYER SETUP STATE ---
 let playerSetupComplete = false;
@@ -1909,9 +2018,10 @@ let p1Selecting = false;
 let p2Selecting = false;
 let highPower = parseInt(localStorage.getItem('galago_high_power')) || 0;
 const BASE_CAPSULE_SPEED = 2.0;
-let defaultLives = 25; // Default lives, can be overridden by config.txt
-let powerUpValve = 100; // How much % each energy capsule fills the bar (menu triggers at 100%), can be overridden by config.txt
-let nukeSpeed = 7.5; // Movement speed of nukes as percentage, can be overridden by config.txt
+const DEFAULT_LIVES = 25, DEFAULT_POWER_UP_VALVE = 100, DEFAULT_NUKE_SPEED = 7.5;
+let defaultLives = DEFAULT_LIVES; // Default lives, can be overridden by config.txt
+let powerUpValve = DEFAULT_POWER_UP_VALVE; // How much % each energy capsule fills the bar (menu triggers at 100%), can be overridden by config.txt
+let nukeSpeed = DEFAULT_NUKE_SPEED; // Movement speed of nukes as percentage, can be overridden by config.txt
 const NUKE_SPEED_BOOST = 1.5; // All nukes move 50% faster than the configured speed
 function getNukeSpeed() { return (nukeSpeed * NUKE_SPEED_BOOST) / 100; }
 let deathShipsPerMinTimer = 0; // When > 0, ShipsPerMin is forced to 0 (death effect, lasts 10s)
@@ -2338,26 +2448,27 @@ function paintSpore() {
     });
 }
 
-// Energy pickup: cluster of glowing blue crystals
-function paintCrystals() {
+// Energy pickup: glass capsule with a glowing energy core (the pulsing halo is added when drawn)
+function paintEnergyCapsule() {
     return paint(16, 24, (g, w, h) => {
-        glowDot(g, 8, 14, 10, '#3fb6ff', 0.6);
-        const crystal = (cx, baseY, cw, ch, tilt) => {
-            g.save(); g.translate(cx, baseY); g.rotate(tilt);
-            const hw = cw / 2;
-            poly(g, [-hw, 0, -hw, -ch * 0.72, 0, -ch, 0, 0]);
-            g.fillStyle = linGrad(g, -hw, 0, 0, -ch, [[0, '#0b3f8a'], [1, '#3d8fe0']]); g.fill();
-            poly(g, [0, 0, 0, -ch, hw, -ch * 0.72, hw, 0]);
-            g.fillStyle = linGrad(g, 0, 0, hw, -ch, [[0, '#5ec4ff'], [1, '#d8f4ff']]); g.fill();
-            poly(g, [-hw, 0, -hw, -ch * 0.72, 0, -ch, hw, -ch * 0.72, hw, 0]);
-            g.strokeStyle = 'rgba(4,20,50,0.9)'; g.lineWidth = 0.35; g.stroke();
-            line(g, 0, -ch + 0.4, 0, -0.4, 'rgba(255,255,255,0.8)', 0.3);
-            g.restore();
-        };
-        crystal(4.6, 23, 3.6, 12, -0.38);
-        crystal(11.6, 23, 3.6, 13.5, 0.32);
-        crystal(8, 23.5, 5, 21, 0);
-        glowDot(g, 8.6, 6, 2.2, '#bfeaff', 0.9);
+        glowDot(g, 8, 12, 9, '#3fb6ff', 0.5);
+        // Glass shell, shaded as a cylinder
+        roundRect(g, 3, 1, 10, 22, 5);
+        g.fillStyle = linGrad(g, 3, 0, 13, 0, [[0, '#0a2c5c'], [0.35, '#2f8fe0'], [0.6, '#1d6cc0'], [1, '#071a3a']]); g.fill();
+        // Energy core
+        roundRect(g, 5.2, 3.6, 5.6, 16.8, 2.8);
+        g.fillStyle = linGrad(g, 5.2, 0, 10.8, 0, [[0, '#2aa8ff'], [0.45, '#e6f8ff'], [1, '#2aa8ff']]); g.fill();
+        glowDot(g, 8, 8, 4.5, '#7fd8ff', 0.9);
+        glowDot(g, 8, 16, 4.5, '#7fd8ff', 0.9);
+        // Metal band around the middle
+        g.fillStyle = linGrad(g, 3, 0, 13, 0, [[0, '#2a323c'], [0.35, '#d4dde6'], [0.7, '#6d7a88'], [1, '#1a2028']]);
+        g.fillRect(3, 11, 10, 2);
+        line(g, 3, 11, 13, 11, 'rgba(255,255,255,0.35)', 0.25);
+        // Outline and glass highlights
+        roundRect(g, 3, 1, 10, 22, 5);
+        g.strokeStyle = 'rgba(150,220,255,0.9)'; g.lineWidth = 0.5; g.stroke();
+        line(g, 4.9, 4.5, 4.9, 9.5, 'rgba(255,255,255,0.85)', 0.7);
+        line(g, 4.9, 14.5, 4.9, 18, 'rgba(255,255,255,0.55)', 0.5);
     });
 }
 
@@ -2452,7 +2563,7 @@ const artHiRes = {
     charger: paintCharger(), shooter: paintShooter(),
     fatty: paintFatty(), bugger: paintBugger(),
     bullet: paintBolt('#ffb52e', false), enemyBullet: paintBolt('#ff4a1a', true), spore: paintSpore(),
-    capsule: paintCrystals(), rocket: paintRocket(),
+    capsule: paintEnergyCapsule(), rocket: paintRocket(),
     nuke_pickup: paintNukeCanister(), nuke_missile: paintNukeMissile(),
     shield: paintShield('#4fc3ff'), shield_hit: paintShield('#ffb030')
 };
@@ -2461,7 +2572,7 @@ const artHiRes = {
 // to the size it is drawn at, and gameplay draws use cheap low-quality smoothing
 const SPRITE_SIZES = {
     p1: [64, 64], p2: [64, 64], charger: [32, 32], shooter: [32, 32], fatty: [64, 64], bugger: [32, 32],
-    bullet: [8, 16], enemyBullet: [12, 20], spore: [24, 24], capsule: [16, 24], powerup: [16, 24], rocket: [16, 32],
+    bullet: [8, 16], enemyBullet: [12, 20], spore: [24, 24], capsule: [16, 24], rocket: [16, 32],
     nuke_pickup: [32, 32], nuke_missile: [32, 32], shield: [80, 80], shield_hit: [80, 80]
 };
 function toGameSize(key, img) {
@@ -2728,11 +2839,13 @@ function drawStars() {
 }
 
 // --- 5. CONFIG & FILE LOADING ---
-function parseConfigText(text) {
-    if(!text || text.trim() === "") return;
+function parseConfigText(text, source) {
+    if(!text || text.trim() === "") return false;
 
     levelTimeline = []; 
     eventTimeline = [];
+    // Settings missing from this config go back to their defaults rather than keeping a previous config's values
+    defaultLives = DEFAULT_LIVES; powerUpValve = DEFAULT_POWER_UP_VALVE; nukeSpeed = DEFAULT_NUKE_SPEED;
     
     // Start with default config that will be inherited
     let workingConfig = { 
@@ -2849,12 +2962,34 @@ function parseConfigText(text) {
     levelTimeline.sort((a,b) => a.time - b.time);
     eventTimeline.sort((a,b) => a.time - b.time);
     console.log('Config parsed - PowerUpValve:', powerUpValve, 'NukeSpeed:', nukeSpeed);
-    showToast(`Config Loaded! (${levelTimeline.length} Levels, ${eventTimeline.length} Events)`);
+    showToast(`${source || 'Config'} Loaded! (${levelTimeline.length} Levels, ${eventTimeline.length} Events)`);
     
     if (!gameStarted && levelTimeline.length > 0) {
         const startLvl = levelTimeline.filter(lvl => lvl.time === 0).pop();
         if(startLvl) { enemyConfig = startLvl.config; currentLevelName = startLvl.name; document.getElementById('levelIndicator').innerText = currentLevelName; }
     }
+    return true;
+}
+
+// Parse a config and, before the game starts, give both players its lives
+function applyConfig(text, source) {
+    if (!parseConfigText(text, source)) return false;
+    if (!gameStarted) {
+        players[0].lives = defaultLives;
+        players[1].lives = defaultLives;
+        updateHud();
+    }
+    return true;
+}
+
+// The last config read from config.txt or loaded by hand is remembered, so opening index.html
+// straight from disk (where browsers block reading config.txt) still uses the latest settings
+const CONFIG_STORAGE_KEY = 'mathnuke_config';
+function saveConfigText(text) {
+    try { localStorage.setItem(CONFIG_STORAGE_KEY, text); } catch (e) {}
+}
+function loadSavedConfigText() {
+    try { return localStorage.getItem(CONFIG_STORAGE_KEY); } catch (e) { return null; }
 }
 
 // --- FILE UPLOAD HANDLERS ---
@@ -2879,13 +3014,7 @@ function setupFileLoader(btnId, inputId, handler) {
 
 // Config Loader
 setupFileLoader('btnLoadConfig', 'configFile', (text) => {
-    parseConfigText(text);
-    // Only update lives if game hasn't started
-    if (!gameStarted) {
-        players[0].lives = defaultLives;
-        players[1].lives = defaultLives;
-        updateHud(); // Show the new lives value
-    }
+    if (applyConfig(text, 'Config.txt')) saveConfigText(text);
     canvas.focus();
 });
 
@@ -2914,19 +3043,16 @@ window.addEventListener('load', () => {
     // Webfonts change text metrics; refit once they arrive
     if (document.fonts) document.fonts.ready.then(fitToWindow);
 
-    // Try to load config.txt
+    // Load config.txt; if the browser can't read it (opened from disk), use the last config
+    // loaded, else the built-in copy
     fetch('config.txt?t=' + Date.now())
         .then(res => { if(!res.ok) throw new Error("404"); return res.text(); })
-        .then(text => {
-            parseConfigText(text);
-            // Only update lives if game hasn't started
-            if (!gameStarted) {
-                players[0].lives = defaultLives;
-                players[1].lives = defaultLives;
-                updateHud(); // Show lives from config
-            }
-        })
-        .catch(e => console.log("Manual config load required"));
+        .then(text => { if (applyConfig(text, 'Config.txt')) saveConfigText(text); })
+        .catch(e => {
+            console.log("config.txt could not be read (" + e.message + "), using a fallback config");
+            if (applyConfig(loadSavedConfigText(), 'Saved config')) return;
+            applyConfig(document.getElementById('bundledConfig').textContent, 'Built-in config');
+        });
     
     // Try to load local PNGs if they exist
     const tryLoad = (name, key) => {
@@ -2937,7 +3063,6 @@ window.addEventListener('load', () => {
     };
     tryLoad('p1.png', 'p1');
     tryLoad('p2.png', 'p2');
-    tryLoad('powerup.png', 'powerup'); // Powerup capsule art
     tryLoad('shield.png', 'shield'); // Power shield art
     tryLoad('shield_hit.png', 'shield_hit'); // Damaged power shield art
 });
@@ -4553,11 +4678,26 @@ function draw() {
     });
     ctx.restore();
     capsules.forEach(c => {
-        const pulse = 0.5 + 0.5 * Math.sin(animFrame * 0.12 + c.x);
-        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25 + 0.25 * pulse;
-        ctx.drawImage(getGlowSprite(c.type === 'nuke' ? '#ffd84a' : '#3fb6ff'), c.x + c.w/2 - c.h, c.y + c.h/2 - c.h, c.h * 2, c.h * 2);
+        const cx = c.x + c.w/2, cy = c.y + c.h/2;
+        if (c.type === 'nuke') {
+            const pulse = 0.5 + 0.5 * Math.sin(animFrame * 0.12 + c.x);
+            ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25 + 0.25 * pulse;
+            ctx.drawImage(getGlowSprite('#ffd84a'), cx - c.h, cy - c.h, c.h * 2, c.h * 2);
+            ctx.restore();
+            ctx.drawImage(assets.nuke_pickup, c.x, c.y, c.w, c.h);
+            return;
+        }
+        // Energy capsule: halo and core slowly breathe (about a 2.5s cycle)
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 400 + c.x);
+        const r = c.h * (0.8 + 0.45 * pulse);
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.2 + 0.6 * pulse;
+        ctx.drawImage(getGlowSprite('#3fb6ff'), cx - r, cy - r, r * 2, r * 2);
         ctx.restore();
-        ctx.drawImage((c.type==='nuke'?assets.nuke_pickup:(assets.powerup||assets.capsule)), c.x, c.y, c.w, c.h);
+        ctx.drawImage(assets.capsule, c.x, c.y, c.w, c.h);
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.15 + 0.4 * pulse;
+        ctx.drawImage(getGlowSprite('#7fd8ff'), cx - c.w * 0.6, cy - c.h * 0.45, c.w * 1.2, c.h * 0.9);
+        ctx.restore();
     });
     players.forEach((p, i) => {
         if(p.dead || p.state === 'respawning') return;
