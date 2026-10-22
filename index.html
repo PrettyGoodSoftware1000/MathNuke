@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Void Rogues: Infinity Times a Billion</title>
+    <title>Space Pirate 3000k: Infinity Times a Billion</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         /* --- THEME (military sci-fi: gunmetal panels, blue glow, gold accents) --- */
         :root {
@@ -28,7 +28,7 @@
             --p1: #3fb6ff;
             --p2: #ff8a3d;
             --head-font: 'Orbitron', 'Eurostile', 'Segoe UI', sans-serif;
-            --block-font: 'Black Ops One', 'Orbitron', Impact, 'Arial Black', sans-serif;
+            --block-font: 'Orbitron', 'Eurostile', 'Arial Black', sans-serif;
             --body-font: 'Rajdhani', 'Segoe UI', 'Helvetica Neue', sans-serif;
             --chamfer: 14px;
         }
@@ -181,20 +181,20 @@
             border-bottom: 2px solid var(--gold);
             position: relative;
         }
-        /* Epic block-type title: a dark extruded layer behind a chrome-and-fire face with a
-           light glint sweeping across it */
-        .epic { position: relative; display: inline-block; font-family: var(--block-font); line-height: 1; white-space: nowrap; }
+        /* Sci-fi title: wide heavy block type in polished steel (white over blue-gray with a
+           chrome horizon line), a navy extruded edge, blue glow and a light glint sweeping across */
+        .epic { position: relative; display: inline-block; font-family: var(--block-font); font-weight: 900; line-height: 1; white-space: nowrap; }
         .epic-depth, .epic-face { display: block; }
         .epic-depth {
             position: absolute; left: 0; top: 0;
-            color: #4a0702;
-            text-shadow: 1px 1px 0 #3d0602, 2px 2px 0 #330501, 3px 3px 0 #290401, 4px 4px 0 #1f0300,
-                         5px 5px 0 #150200, 6px 6px 10px rgba(0,0,0,0.9), 0 0 24px rgba(255,80,20,0.55);
+            color: #1b3352;
+            text-shadow: 1px 1px 0 #172c47, 2px 2px 0 #13253c, 3px 3px 0 #0f1e31, 4px 4px 0 #0b1726,
+                         5px 5px 0 #08111c, 6px 6px 10px rgba(0,0,0,0.9), 0 0 24px rgba(63,182,255,0.55);
         }
         .epic-face {
             position: relative;
             background: linear-gradient(105deg, transparent 0%, transparent 40%, rgba(255,255,255,0.95) 48%, transparent 56%, transparent 100%),
-                        linear-gradient(180deg, #ffffff 0%, #ffe9a8 30%, #ffae2e 48%, #ff4a12 52%, #a3120a 78%, #ffd27a 100%);
+                        linear-gradient(180deg, #ffffff 0%, #e4ecf4 30%, #a9bccf 48%, #2d4c70 52%, #5f86ae 78%, #e6f6ff 100%);
             background-size: 250% 100%, 100% 100%;
             background-repeat: no-repeat;
             -webkit-background-clip: text; background-clip: text;
@@ -207,16 +207,16 @@
         }
         .epic-sub {
             display: block;
-            font-family: var(--head-font); font-weight: 900;
-            color: #ffd27a;
-            text-shadow: 0 0 6px rgba(255,140,40,0.8), 0 0 14px rgba(255,60,20,0.5);
+            font-family: var(--head-font); font-weight: 700;
+            color: #d6ecff;
+            text-shadow: 0 0 6px rgba(63,182,255,0.9), 0 0 14px rgba(40,120,255,0.5);
             text-transform: uppercase;
             white-space: nowrap;
         }
         #gameTitle { text-align: center; line-height: 1; }
-        #gameTitle .epic { font-size: 19px; letter-spacing: 3px; }
-        #gameTitle .epic-depth { text-shadow: 1px 1px 0 #330501, 2px 2px 0 #1f0300, 0 0 10px rgba(255,80,20,0.6); }
-        #gameTitle .epic-sub { font-size: 7px; letter-spacing: 3.2px; margin-top: 2px; }
+        #gameTitle .epic { font-size: 14px; letter-spacing: 2px; }
+        #gameTitle .epic-depth { text-shadow: 1px 1px 0 #13253c, 2px 2px 0 #0b1726, 0 0 10px rgba(63,182,255,0.6); }
+        #gameTitle .epic-sub { font-size: 7px; letter-spacing: 3.2px; margin-top: 3px; }
         #levelIndicator {
             margin-top: 3px;
             font-family: var(--head-font);
@@ -902,9 +902,13 @@
             background: linear-gradient(90deg, transparent, var(--gold), transparent);
         }
         .logo { text-align: center; }
-        .logo .epic { font-size: 64px; letter-spacing: 6px; }
-        .logo .epic-sub { font-size: 15px; letter-spacing: 9px; margin-top: 10px; }
-        .logo .epic-sub::before, .logo .epic-sub::after { content: '\2605'; margin: 0 14px; color: #ff6a1a; }
+        .logo .epic { font-size: 40px; letter-spacing: 4px; }
+        .logo .epic-sub { font-size: 14px; letter-spacing: 8px; margin-top: 12px; }
+        .logo .epic-sub::before, .logo .epic-sub::after {
+            content: ''; display: inline-block; vertical-align: middle; width: 48px; height: 1px; margin: 0 14px;
+            background: linear-gradient(90deg, rgba(63,182,255,0), #8fd3ff, rgba(63,182,255,0));
+            box-shadow: 0 0 6px #3fb6ff;
+        }
 
         .setup-title {
             margin-top: 8px;
@@ -1067,7 +1071,7 @@
         <div class="frame chamfer setup-frame">
         <div class="frame-inner chamfer setup-container">
             <div class="setup-header">
-                <div class="logo"><span class="epic"><span class="epic-depth">VOID ROGUES</span><span class="epic-face">VOID ROGUES</span></span><span class="epic-sub">Infinity Times a Billion</span></div>
+                <div class="logo"><span class="epic"><span class="epic-depth">SPACE PIRATE 3000k</span><span class="epic-face">SPACE PIRATE 3000k</span></span><span class="epic-sub">Infinity Times a Billion</span></div>
                 <div class="setup-title">Mission Setup</div>
             </div>
             
@@ -1129,7 +1133,7 @@
                 <div class="res-item" title="Nukes"><span class="res-icon icon nukes" data-icon="nuke"></span><span class="res-val" id="p1-nukes-val">&mdash;</span></div>
             </div>
             <div class="title-plaque chamfer">
-                <div id="gameTitle"><span class="epic"><span class="epic-depth">VOID ROGUES</span><span class="epic-face">VOID ROGUES</span></span><span class="epic-sub">Infinity Times a Billion</span></div>
+                <div id="gameTitle"><span class="epic"><span class="epic-depth">SPACE PIRATE 3000k</span><span class="epic-face">SPACE PIRATE 3000k</span></span><span class="epic-sub">Infinity Times a Billion</span></div>
                 <div id="levelIndicator">LEVEL 1</div>
             </div>
             <div id="p2Stats" class="res-plate chamfer team-p2">
@@ -1815,41 +1819,44 @@ function drawGlowText(text, x, y, size, color, opts = {}) {
     ctx.restore();
 }
 
-// "VOID ROGUES" in huge extruded block type with fiery chrome, a sweeping glint and slowly
-// turning light rays behind it, over "INFINITY TIMES A BILLION"
-const BLOCK_FONT = "'Black Ops One', 'Orbitron', Impact, sans-serif";
+// "SPACE PIRATE 3000k" in big extruded sci-fi block type - polished steel with a chrome horizon
+// line, a navy edge, blue glow, a sweeping glint and slowly turning light rays behind it -
+// over "INFINITY TIMES A BILLION"
+const BLOCK_FONT = "'Orbitron', 'Eurostile', 'Arial Black', sans-serif";
 const epicTitleCanvas = document.createElement('canvas');
 function drawEpicTitle(x, y) {
-    const t = performance.now() / 1000, size = 62, text = 'VOID ROGUES';
+    const t = performance.now() / 1000, text = 'SPACE PIRATE 3000k', maxWidth = 560;
     // Light rays
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.translate(x, y); ctx.rotate(t * 0.15);
     for (let k = 0; k < 16; k++) {
         ctx.rotate(Math.PI / 8);
-        const ray = ctx.createLinearGradient(0, 0, 230, 0);
-        ray.addColorStop(0, 'rgba(255,150,40,0.22)'); ray.addColorStop(1, 'rgba(255,60,20,0)');
+        const ray = ctx.createLinearGradient(0, 0, 260, 0);
+        ray.addColorStop(0, 'rgba(120,200,255,0.2)'); ray.addColorStop(1, 'rgba(40,120,255,0)');
         ctx.fillStyle = ray;
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(230, -16); ctx.lineTo(230, 16); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(260, -16); ctx.lineTo(260, 16); ctx.closePath(); ctx.fill();
     }
     ctx.restore();
-    // Title drawn off screen so the glint can be clipped to the letters
+    // Title drawn off screen so the glint can be clipped to the letters; shrunk to fit the panel
     const c = epicTitleCanvas, g = c.getContext('2d');
-    g.font = `${size}px ${BLOCK_FONT}`;
-    setLetterSpacing(g, 4);
+    const setFont = sz => { g.font = `900 ${sz}px ${BLOCK_FONT}`; setLetterSpacing(g, 3); };
+    let size = 46; setFont(size);
+    const natural = g.measureText(text).width;
+    if (natural > maxWidth) { size = Math.floor(size * maxWidth / natural); setFont(size); }
     const tw = Math.ceil(g.measureText(text).width) + 40, th = size + 30;
     if (c.width !== tw || c.height !== th) { c.width = tw; c.height = th; }
     g.clearRect(0, 0, tw, th);
-    g.font = `${size}px ${BLOCK_FONT}`; setLetterSpacing(g, 4);
+    setFont(size);
     g.textAlign = 'center'; g.textBaseline = 'middle';
     const cx = tw / 2, cy = th / 2 - 4;
-    // Extruded depth
-    for (let d = 7; d >= 1; d--) { g.fillStyle = `rgb(${40 + d * 6},${4 + d},${2})`; g.fillText(text, cx + d * 0.8, cy + d); }
-    // Chrome-and-fire face
+    // Extruded navy edge
+    for (let d = 6; d >= 1; d--) { g.fillStyle = `rgb(${8 + d * 3},${18 + d * 6},${32 + d * 9})`; g.fillText(text, cx + d * 0.8, cy + d); }
+    // Polished steel face
     const face = g.createLinearGradient(0, cy - size / 2, 0, cy + size / 2);
-    [[0, '#ffffff'], [0.3, '#ffe9a8'], [0.48, '#ffae2e'], [0.52, '#ff4a12'], [0.78, '#a3120a'], [1, '#ffd27a']].forEach(([o, col]) => face.addColorStop(o, col));
+    [[0, '#ffffff'], [0.3, '#e4ecf4'], [0.48, '#a9bccf'], [0.52, '#2d4c70'], [0.78, '#5f86ae'], [1, '#e6f6ff']].forEach(([o, col]) => face.addColorStop(o, col));
     g.fillStyle = face; g.fillText(text, cx, cy);
-    g.strokeStyle = 'rgba(255,240,200,0.55)'; g.lineWidth = 1; g.strokeText(text, cx, cy);
+    g.strokeStyle = 'rgba(220,240,255,0.6)'; g.lineWidth = 1; g.strokeText(text, cx, cy);
     // Glint
     const gx = ((t * 0.45) % 1.6 - 0.3) * tw;
     g.save(); g.globalCompositeOperation = 'source-atop';
@@ -1858,10 +1865,21 @@ function drawEpicTitle(x, y) {
     g.fillStyle = glint; g.fillRect(0, 0, tw, th);
     g.restore();
     ctx.save();
-    ctx.shadowColor = '#ff5a1a'; ctx.shadowBlur = 22 + 10 * Math.sin(t * 2);
+    ctx.shadowColor = '#3fb6ff'; ctx.shadowBlur = 20 + 8 * Math.sin(t * 2);
     ctx.drawImage(c, x - tw / 2, y - th / 2);
     ctx.restore();
-    drawGlowText('★  INFINITY TIMES A BILLION  ★', x, y + 48, 15, '#ffd27a', { weight: 900, spacing: 6, glow: '#ff6a1a', blur: 12 });
+    // Subtitle flanked by thin light lines
+    const sy = y + size / 2 + 22;
+    drawGlowText('INFINITY TIMES A BILLION', x, sy, 15, '#d6ecff', { weight: 700, spacing: 6, glow: '#3fb6ff', blur: 12 });
+    ctx.save();
+    ctx.shadowColor = '#3fb6ff'; ctx.shadowBlur = 8;
+    [-1, 1].forEach(side => {
+        const x0 = x + side * 210, x1 = x + side * 270;
+        const line = ctx.createLinearGradient(x0, 0, x1, 0);
+        line.addColorStop(0, '#8fd3ff'); line.addColorStop(1, 'rgba(63,182,255,0)');
+        ctx.fillStyle = line; ctx.fillRect(Math.min(x0, x1), sy - 0.5, 60, 1.5);
+    });
+    ctx.restore();
 }
 
 // Horizontal objective banner across the battlefield (level start, alerts, defeat)
