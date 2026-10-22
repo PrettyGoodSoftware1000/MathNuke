@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MATH NUKE</title>
+    <title>Void Rogues: Infinity Times a Billion</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         /* --- THEME (military sci-fi: gunmetal panels, blue glow, gold accents) --- */
         :root {
@@ -28,6 +28,7 @@
             --p1: #3fb6ff;
             --p2: #ff8a3d;
             --head-font: 'Orbitron', 'Eurostile', 'Segoe UI', sans-serif;
+            --block-font: 'Black Ops One', 'Orbitron', Impact, 'Arial Black', sans-serif;
             --body-font: 'Rajdhani', 'Segoe UI', 'Helvetica Neue', sans-serif;
             --chamfer: 14px;
         }
@@ -168,7 +169,7 @@
 
         .title-plaque {
             --chamfer: 16px;
-            width: 260px;
+            width: 300px;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
@@ -180,23 +181,47 @@
             border-bottom: 2px solid var(--gold);
             position: relative;
         }
-        #gameTitle {
-            font-family: var(--head-font);
-            font-weight: 900;
-            font-size: 16px;
-            letter-spacing: 4px;
-            line-height: 1;
-            background: linear-gradient(180deg, #ffffff 0%, #ffb3a6 45%, #ff3b2f 55%, #8a1010 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            filter: drop-shadow(0 0 6px rgba(255, 60, 40, 0.55));
+        /* Epic block-type title: a dark extruded layer behind a chrome-and-fire face with a
+           light glint sweeping across it */
+        .epic { position: relative; display: inline-block; font-family: var(--block-font); line-height: 1; white-space: nowrap; }
+        .epic-depth, .epic-face { display: block; }
+        .epic-depth {
+            position: absolute; left: 0; top: 0;
+            color: #4a0702;
+            text-shadow: 1px 1px 0 #3d0602, 2px 2px 0 #330501, 3px 3px 0 #290401, 4px 4px 0 #1f0300,
+                         5px 5px 0 #150200, 6px 6px 10px rgba(0,0,0,0.9), 0 0 24px rgba(255,80,20,0.55);
         }
+        .epic-face {
+            position: relative;
+            background: linear-gradient(105deg, transparent 0%, transparent 40%, rgba(255,255,255,0.95) 48%, transparent 56%, transparent 100%),
+                        linear-gradient(180deg, #ffffff 0%, #ffe9a8 30%, #ffae2e 48%, #ff4a12 52%, #a3120a 78%, #ffd27a 100%);
+            background-size: 250% 100%, 100% 100%;
+            background-repeat: no-repeat;
+            -webkit-background-clip: text; background-clip: text;
+            color: transparent;
+            animation: epic-glint 4.5s ease-in-out infinite;
+        }
+        @keyframes epic-glint {
+            0%, 55% { background-position: 130% 0, 0 0; }
+            100% { background-position: -130% 0, 0 0; }
+        }
+        .epic-sub {
+            display: block;
+            font-family: var(--head-font); font-weight: 900;
+            color: #ffd27a;
+            text-shadow: 0 0 6px rgba(255,140,40,0.8), 0 0 14px rgba(255,60,20,0.5);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        #gameTitle { text-align: center; line-height: 1; }
+        #gameTitle .epic { font-size: 19px; letter-spacing: 3px; }
+        #gameTitle .epic-depth { text-shadow: 1px 1px 0 #330501, 2px 2px 0 #1f0300, 0 0 10px rgba(255,80,20,0.6); }
+        #gameTitle .epic-sub { font-size: 7px; letter-spacing: 3.2px; margin-top: 2px; }
         #levelIndicator {
-            margin-top: 4px;
+            margin-top: 3px;
             font-family: var(--head-font);
             font-weight: 900;
-            font-size: 17px;
+            font-size: 13px;
             line-height: 1;
             letter-spacing: 4px;
             color: var(--gold);
@@ -774,21 +799,32 @@
             color: #ff00ff;
         }
         
-        /* Alert line */
-        #toast {
-            position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-            padding: 8px 28px 8px 22px;
-            background: linear-gradient(90deg, rgba(5,10,16,0.0) 0%, rgba(5,10,16,0.9) 12%, rgba(5,10,16,0.9) 88%, rgba(5,10,16,0.0) 100%);
-            border-top: 1px solid rgba(245,196,81,0.5);
-            border-bottom: 1px solid rgba(245,196,81,0.5);
-            color: var(--gold);
-            font-family: var(--head-font); font-size: 14px; font-weight: 700; letter-spacing: 2px;
-            text-transform: uppercase;
-            text-shadow: 0 0 8px var(--gold-soft);
-            white-space: nowrap;
-            opacity: 0;
-            transition: opacity 0.5s; pointer-events: none; z-index: 2000;
+        /* Notifications take over the radar screen for a moment instead of covering the battlefield */
+        .radar-screen { position: relative; width: 200px; height: 100px; }
+        #radar-notice {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column; justify-content: center; gap: 4px;
+            padding: 4px 8px;
+            background: radial-gradient(ellipse at 50% 50%, #0d1b28 0%, #03070b 100%);
+            border: 1px solid #4b5f72;
+            box-shadow: 0 0 8px rgba(63,182,255,0.3);
+            opacity: 0; transition: opacity 0.25s; pointer-events: none;
+            overflow: hidden;
         }
+        #radar-notice.active { opacity: 1; }
+        .notice { text-align: center; color: var(--notice-color, var(--gold)); }
+        .notice + .notice { border-top: 1px solid rgba(255,255,255,0.12); padding-top: 4px; }
+        .notice-title {
+            font-family: var(--head-font); font-size: 12px; font-weight: 900; letter-spacing: 1px; line-height: 1.15;
+            text-transform: uppercase;
+            text-shadow: 0 0 8px var(--notice-color, var(--gold));
+        }
+        .notice-sub {
+            font-family: var(--head-font); font-size: 8px; font-weight: 700; letter-spacing: 2px;
+            text-transform: uppercase; color: #cfe0ee; opacity: 0.8; margin-top: 2px;
+        }
+        .notice.flash .notice-title { animation: notice-flash 0.5s steps(1) infinite; }
+        @keyframes notice-flash { 50% { opacity: 0; } }
 
         #left-gutter, #right-gutter {
             position: fixed; top: 0; bottom: 0; width: 160px; pointer-events: none;
@@ -865,25 +901,11 @@
             height: 2px;
             background: linear-gradient(90deg, transparent, var(--gold), transparent);
         }
-        .logo {
-            font-family: var(--head-font);
-            font-weight: 900;
-            font-size: 44px;
-            letter-spacing: 8px;
-            line-height: 1;
-            background: linear-gradient(180deg, #ffffff 0%, #c7dcef 40%, #6d8aa6 55%, #dfeaf5 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            filter: drop-shadow(0 0 10px rgba(63,182,255,0.5));
-        }
-        .logo span {
-            background: linear-gradient(180deg, #fff 0%, #ffb3a6 40%, #ff3b2f 55%, #8a1010 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            margin-left: 14px;
-        }
-        
+        .logo { text-align: center; }
+        .logo .epic { font-size: 64px; letter-spacing: 6px; }
+        .logo .epic-sub { font-size: 15px; letter-spacing: 9px; margin-top: 10px; }
+        .logo .epic-sub::before, .logo .epic-sub::after { content: '\2605'; margin: 0 14px; color: #ff6a1a; }
+
         .setup-title {
             margin-top: 8px;
             color: var(--gold);
@@ -1045,7 +1067,7 @@
         <div class="frame chamfer setup-frame">
         <div class="frame-inner chamfer setup-container">
             <div class="setup-header">
-                <div class="logo">MATH<span>NUKE</span></div>
+                <div class="logo"><span class="epic"><span class="epic-depth">VOID ROGUES</span><span class="epic-face">VOID ROGUES</span></span><span class="epic-sub">Infinity Times a Billion</span></div>
                 <div class="setup-title">Mission Setup</div>
             </div>
             
@@ -1107,7 +1129,7 @@
                 <div class="res-item" title="Nukes"><span class="res-icon icon nukes" data-icon="nuke"></span><span class="res-val" id="p1-nukes-val">&mdash;</span></div>
             </div>
             <div class="title-plaque chamfer">
-                <div id="gameTitle">MATH NUKE</div>
+                <div id="gameTitle"><span class="epic"><span class="epic-depth">VOID ROGUES</span><span class="epic-face">VOID ROGUES</span></span><span class="epic-sub">Infinity Times a Billion</span></div>
                 <div id="levelIndicator">LEVEL 1</div>
             </div>
             <div id="p2Stats" class="res-plate chamfer team-p2">
@@ -1135,7 +1157,6 @@
                 <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
                 <div id="p1-menu" class="weapon-menu team-p1"></div>
                 <div id="p2-menu" class="weapon-menu team-p2"></div>
-                <div id="toast">Ready!</div>
             </div>
 
             <div class="sidebar team-p2" id="p2-sidebar">
@@ -1168,7 +1189,10 @@
             <div class="console-center glow-wrap">
                 <div class="frame chamfer" style="height:100%">
                 <div class="frame-inner chamfer">
-                    <canvas id="minimap" width="200" height="100"></canvas>
+                    <div class="radar-screen">
+                        <canvas id="minimap" width="200" height="100"></canvas>
+                        <div id="radar-notice"></div>
+                    </div>
                     <div class="mission-info"><span id="mission-time">0:00</span><span><b id="mission-hostiles">0</b> HOSTILES</span></div>
                 </div>
                 </div>
@@ -1367,7 +1391,7 @@ function updateSetupControlsInfo() {
             lines.push('<strong>P2:</strong> Stick Move | A Fire | B Rockets | X Nuke');
         }
     }
-    lines.push('<strong>O</strong> Fill Power | <strong>T</strong> Timer | <strong>P</strong> Pause');
+    lines.push('<strong>O</strong> Fill Power | <strong>T</strong> Timer | <strong>Esc</strong>/<strong>P</strong> Pause');
     document.getElementById('setup-controls-list').innerHTML = lines.join('<br>');
 }
 
@@ -1538,6 +1562,8 @@ const WEAPON_INFO = {
     54:  { icon: 'gamma',   desc: 'Violet gamma beams pierce basic enemies, exploding at every one they pass through.' },
     6:   { icon: 'minigun', desc: 'Auto-turret. Sprays 20 rounds at enemies over 2s, then cools down for 16s.' },
     61:  { icon: 'minigun', desc: 'Overdriven reactor. Mini-Gun cooldown drops to 8s.' },
+    63:  { icon: 'minigun', desc: 'Dangerously overclocked reactor. Mini-Gun cooldown drops to 4s.' },
+    64:  { icon: 'minigun', desc: 'Off-the-books reactor of dubious origin. Mini-Gun cooldown drops to 2s.' },
     62:  { icon: 'minigun', desc: 'Plasma-cooled barrels. Each Mini-Gun burst fires 40 rounds over 4s.' },
     4:   { icon: 'shield',  desc: 'Energy barrier. Absorbs a hit, then shatters into shrapnel.' },
     41:  { icon: 'shatter', desc: 'Reinforced barrier that absorbs 5 hits before shattering.' },
@@ -1589,7 +1615,7 @@ function getUpgradeTiles(p) {
         { icon: p.hasOchoMissiles ? 'ocho' : 'rocket', on: p.hasRockets, lvl: p.hasRockets ? String(p.maxMissiles) : '', name: p.hasOchoMissiles ? 'Missiles 8: The Ocho' : 'Quad-Rockets' },
         { icon: 'reload', on: p.hasDoubleMissileSpeed, name: 'Double Missile Reload Speed' },
         { icon: p.chargedShotLevel >= GAMMA_SHOT_LEVEL ? 'gamma' : 'charge', on: p.chargedShotLevel > 0, lvl: p.chargedShotLevel > 0 ? 'L' + p.chargedShotLevel : '', name: p.chargedShotLevel >= GAMMA_SHOT_LEVEL ? 'Gamma Shot' : 'Charged Shot' },
-        { icon: 'minigun', on: p.hasMiniGun, lvl: (p.hasMiniGunReactor ? 'R' : '') + (p.hasPlasmaticBarrels ? 'P' : ''), name: ['Mini-Gun', p.hasMiniGunReactor ? 'Reactor' : '', p.hasPlasmaticBarrels ? 'Plasmatic Barrels' : ''].filter(Boolean).join(' + ') },
+        { icon: 'minigun', on: p.hasMiniGun, lvl: (p.miniGunReactorLevel > 0 ? 'R' + p.miniGunReactorLevel : '') + (p.hasPlasmaticBarrels ? 'P' : ''), name: ['Mini-Gun', MINIGUN_REACTOR_NAMES[p.miniGunReactorLevel], p.hasPlasmaticBarrels ? 'Plasmatic Barrels' : ''].filter(Boolean).join(' + ') },
         { icon: 'nuke', on: p.hasNuclearWeapon, lvl: p.hasNuclearWeapon ? String(p.maxNukes) : '', name: 'Nuclear Bomb' },
         { icon: 'cluster', on: p.hasClusterNukes, name: 'Cluster Nukes' },
         { icon: p.shatterShieldLevel > 0 ? 'shatter' : 'shield', on: p.hasPowerShield, lvl: p.hasPowerShield ? String(shieldHits + 1 - p.powerShieldHits) : '', name: p.shatterShieldLevel > 0 ? 'Shatter Shield x5' : 'Power Shield' }
@@ -1789,6 +1815,55 @@ function drawGlowText(text, x, y, size, color, opts = {}) {
     ctx.restore();
 }
 
+// "VOID ROGUES" in huge extruded block type with fiery chrome, a sweeping glint and slowly
+// turning light rays behind it, over "INFINITY TIMES A BILLION"
+const BLOCK_FONT = "'Black Ops One', 'Orbitron', Impact, sans-serif";
+const epicTitleCanvas = document.createElement('canvas');
+function drawEpicTitle(x, y) {
+    const t = performance.now() / 1000, size = 62, text = 'VOID ROGUES';
+    // Light rays
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.translate(x, y); ctx.rotate(t * 0.15);
+    for (let k = 0; k < 16; k++) {
+        ctx.rotate(Math.PI / 8);
+        const ray = ctx.createLinearGradient(0, 0, 230, 0);
+        ray.addColorStop(0, 'rgba(255,150,40,0.22)'); ray.addColorStop(1, 'rgba(255,60,20,0)');
+        ctx.fillStyle = ray;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(230, -16); ctx.lineTo(230, 16); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    // Title drawn off screen so the glint can be clipped to the letters
+    const c = epicTitleCanvas, g = c.getContext('2d');
+    g.font = `${size}px ${BLOCK_FONT}`;
+    setLetterSpacing(g, 4);
+    const tw = Math.ceil(g.measureText(text).width) + 40, th = size + 30;
+    if (c.width !== tw || c.height !== th) { c.width = tw; c.height = th; }
+    g.clearRect(0, 0, tw, th);
+    g.font = `${size}px ${BLOCK_FONT}`; setLetterSpacing(g, 4);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const cx = tw / 2, cy = th / 2 - 4;
+    // Extruded depth
+    for (let d = 7; d >= 1; d--) { g.fillStyle = `rgb(${40 + d * 6},${4 + d},${2})`; g.fillText(text, cx + d * 0.8, cy + d); }
+    // Chrome-and-fire face
+    const face = g.createLinearGradient(0, cy - size / 2, 0, cy + size / 2);
+    [[0, '#ffffff'], [0.3, '#ffe9a8'], [0.48, '#ffae2e'], [0.52, '#ff4a12'], [0.78, '#a3120a'], [1, '#ffd27a']].forEach(([o, col]) => face.addColorStop(o, col));
+    g.fillStyle = face; g.fillText(text, cx, cy);
+    g.strokeStyle = 'rgba(255,240,200,0.55)'; g.lineWidth = 1; g.strokeText(text, cx, cy);
+    // Glint
+    const gx = ((t * 0.45) % 1.6 - 0.3) * tw;
+    g.save(); g.globalCompositeOperation = 'source-atop';
+    const glint = g.createLinearGradient(gx - 40, 0, gx + 40, 0);
+    glint.addColorStop(0, 'rgba(255,255,255,0)'); glint.addColorStop(0.5, 'rgba(255,255,255,0.9)'); glint.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = glint; g.fillRect(0, 0, tw, th);
+    g.restore();
+    ctx.save();
+    ctx.shadowColor = '#ff5a1a'; ctx.shadowBlur = 22 + 10 * Math.sin(t * 2);
+    ctx.drawImage(c, x - tw / 2, y - th / 2);
+    ctx.restore();
+    drawGlowText('★  INFINITY TIMES A BILLION  ★', x, y + 48, 15, '#ffd27a', { weight: 900, spacing: 6, glow: '#ff6a1a', blur: 12 });
+}
+
 // Horizontal objective banner across the battlefield (level start, alerts, defeat)
 function drawBanner(title, subtitle, color, y, alpha, size = 52) {
     ctx.save();
@@ -1974,10 +2049,6 @@ function generateMathProblem() {
 let gameTime = 0;
 let showTimer = false;
 let currentLevelName = "LEVEL 1";
-let levelMessage = "";
-let levelMessageTimer = 0;
-let mustardFlashCount = 0;
-let mustardFlashTimer = 0;
 let levelTimeline = []; 
 let nextLevelIndex = 0;
 let levelTransitionPending = false; 
@@ -1995,8 +2066,7 @@ function enemyStillInWave(e) {
 function enterLevel(lvl) {
     enemyConfig = lvl.config;
     currentLevelName = lvl.name;
-    levelMessage = lvl.name;
-    levelMessageTimer = 3000;
+    notify(lvl.name, 'Hostile wave inbound', '#3fb6ff');
     const el = document.getElementById('levelIndicator');
     el.innerText = lvl.name;
     el.classList.remove('level-up'); void el.offsetWidth; el.classList.add('level-up');
@@ -2008,7 +2078,7 @@ function beginMission() {
     let startLevel = null;
     while (nextLevelIndex < levelTimeline.length && levelTimeline[nextLevelIndex].time <= 0) startLevel = levelTimeline[nextLevelIndex++];
     if (startLevel) { enterLevel(startLevel); }
-    else { levelMessage = "START"; levelMessageTimer = 3000; }
+    else { notify('START', 'Engage all hostiles', '#3fb6ff'); }
 }
 
 // --- EVENT TIMELINE ---
@@ -2521,19 +2591,20 @@ function paintNukeMissile() {
         roundRect(g, 8.4, 24.4, 15.2, 3, 1.3); g.fillStyle = olive(8.4, 23.6); g.fill();
         g.strokeStyle = '#0b1206'; g.lineWidth = 0.55; g.stroke();
         line(g, 9.2, 25.1, 22.8, 25.1, 'rgba(220,255,160,0.3)', 0.35);
-        // Short egg-shaped body with a blunt round nose
+        // Short body: a fully rounded, hemispherical nose tapering into the tail
         const body = () => {
-            g.beginPath(); g.moveTo(16, 5.5);
-            g.bezierCurveTo(23.5, 5.5, 26.4, 10.5, 26, 14.2);
-            g.bezierCurveTo(25.6, 18.8, 21, 21.6, 16, 21.6);
-            g.bezierCurveTo(11, 21.6, 6.4, 18.8, 6, 14.2);
-            g.bezierCurveTo(5.6, 10.5, 8.5, 5.5, 16, 5.5); g.closePath();
+            g.beginPath(); g.moveTo(6, 14.2);
+            g.arc(16, 14.2, 10, Math.PI, 0);
+            g.bezierCurveTo(26, 18.8, 21, 21.6, 16, 21.6);
+            g.bezierCurveTo(11, 21.6, 6, 18.8, 6, 14.2); g.closePath();
         };
         body(); g.fillStyle = olive(5.5, 26.5); g.fill();
         g.save(); body(); g.clip();
-        // Dark nose cap
-        g.fillStyle = 'rgba(10,20,4,0.55)'; g.fillRect(0, 0, w, 8);
-        line(g, 5, 8, 27, 8, 'rgba(10,18,4,0.9)', 0.5);
+        // Dark domed nose cap, its seam curving round the nose
+        g.beginPath(); g.moveTo(5, 9.6); g.quadraticCurveTo(16, 6.6, 27, 9.6); g.lineTo(27, 0); g.lineTo(5, 0); g.closePath();
+        g.fillStyle = 'rgba(10,20,4,0.55)'; g.fill();
+        g.beginPath(); g.moveTo(5, 9.6); g.quadraticCurveTo(16, 6.6, 27, 9.6);
+        g.strokeStyle = 'rgba(10,18,4,0.9)'; g.lineWidth = 0.5; g.stroke();
         // Painted yellow band (shaded like the hull, so it reads as paint rather than light)
         g.fillStyle = linGrad(g, 5.5, 0, 26.5, 0, [[0, '#4a3a0c'], [0.3, '#e0b12a'], [0.55, '#c3961f'], [0.85, '#6e5512'], [1, '#3a2d08']]);
         g.fillRect(0, 10.6, w, 6);
@@ -2551,7 +2622,7 @@ function paintNukeMissile() {
         line(g, 5, 18.6, 27, 18.6, 'rgba(10,18,4,0.9)', 0.5);
         [[11, 19.7], [16, 20.1], [21, 19.7]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 0.45, 0, Math.PI * 2); g.fillStyle = '#c8e890'; g.fill(); });
         // Glossy highlight on the nose
-        ellipse(g, 11.4, 8.8, 1.2, 1.9, -0.5); g.fillStyle = 'rgba(240,255,210,0.4)'; g.fill();
+        ellipse(g, 11.6, 7.4, 1.3, 2.1, -0.7); g.fillStyle = 'rgba(240,255,210,0.4)'; g.fill();
         g.restore();
         body(); g.strokeStyle = '#0b1206'; g.lineWidth = 0.6; g.stroke();
         applyLighting(g, w, h, 0.6);
@@ -2714,8 +2785,8 @@ function getTintedSprite(img, color) {
 
 function initPlayers() {
     return [
-        { x: WIDTH * 0.25, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, hasMiniGun: false, hasMiniGunReactor: false, hasPlasmaticBarrels: false, miniGunCooldown: 0, miniGunFiring: false, miniGunShotsLeft: 0, miniGunShotTimer: 0, miniGunSound: null, hasCollectedFirstPowerUp: false },
-        { x: WIDTH * 0.75, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, hasMiniGun: false, hasMiniGunReactor: false, hasPlasmaticBarrels: false, miniGunCooldown: 0, miniGunFiring: false, miniGunShotsLeft: 0, miniGunShotTimer: 0, miniGunSound: null, hasCollectedFirstPowerUp: false }
+        { x: WIDTH * 0.25, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, hasMiniGun: false, miniGunReactorLevel: 0, hasPlasmaticBarrels: false, miniGunCooldown: 0, miniGunFiring: false, miniGunShotsLeft: 0, miniGunShotTimer: 0, miniGunSound: null, hasCollectedFirstPowerUp: false },
+        { x: WIDTH * 0.75, y: PLAYER_START_Y, startY: PLAYER_START_Y, w: 64, h: 64, lives: defaultLives, cd: 0, dead: false, state: 'active', respawnTimer: 0, deathsSinceWeaponLoss: 0, shieldTimer: 0, weaponLevel: 1, hasRockets: false, missileReloadTimer: 0, maxMissiles: 4, currentMissiles: 4, hasDoubleMissileSpeed: false, hasOchoMissiles: false, ochoMissileChargeTimer: 0, nukes: 1, maxNukes: 1, hasNuclearWeapon: false, hasPowerShield: false, powerShieldHits: 0, powerShieldUnlockCount: 0, shatterShieldLevel: 0, hasDoubleSpeed: false, hasSpreadBlaster: false, hasClusterNukes: false, chargedShotLevel: 0, chargeTimer: 0, hasMiniGun: false, miniGunReactorLevel: 0, hasPlasmaticBarrels: false, miniGunCooldown: 0, miniGunFiring: false, miniGunShotsLeft: 0, miniGunShotTimer: 0, miniGunSound: null, hasCollectedFirstPowerUp: false }
     ];
 }
 const players = initPlayers();
@@ -3114,7 +3185,27 @@ window.addEventListener('load', () => {
     tryLoad('shield_hit.png', 'shield_hit'); // Damaged power shield art
 });
 
-function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.style.opacity = 1; setTimeout(() => t.style.opacity = 0, 3000); }
+// Notifications briefly replace the radar: the newest two show at once, each for its own duration
+const radarNotices = [];
+function notify(title, subtitle = '', color = '#f5c451', duration = 3000, flash = false) {
+    const el = document.createElement('div');
+    el.className = 'notice' + (flash ? ' flash' : '');
+    el.style.setProperty('--notice-color', color);
+    el.innerHTML = '<div class="notice-title"></div>' + (subtitle ? '<div class="notice-sub"></div>' : '');
+    el.querySelector('.notice-title').textContent = title;
+    if (subtitle) el.querySelector('.notice-sub').textContent = subtitle;
+    const box = document.getElementById('radar-notice');
+    box.prepend(el);
+    radarNotices.unshift(el);
+    while (radarNotices.length > 2) radarNotices.pop().remove();
+    box.classList.add('active');
+    setTimeout(() => {
+        el.remove();
+        const i = radarNotices.indexOf(el); if (i !== -1) radarNotices.splice(i, 1);
+        if (radarNotices.length === 0) box.classList.remove('active');
+    }, duration);
+}
+function showToast(msg) { notify(msg); }
 function showFloatingText(playerId, amount) {
     const container = document.getElementById(playerId === 0 ? 'left-gutter' : 'right-gutter');
     const el = document.createElement('div'); el.className = 'score-float'; el.innerText = '+' + amount; container.appendChild(el);
@@ -3376,9 +3467,6 @@ function createEnemy(forceType = null) {
     enemies.push(e);
 }
 
-// Weapon loss message state
-let weaponLossMessage = { text: "", timer: 0 };
-
 const CHARGED_SHOT_NAMES = ['', 'Charged Shot', 'Double Charged Shot', 'Triple Charged Shot', 'Charged Shot x5', 'Gamma Shot'];
 
 function destroyRandomWeapon(p, pIdx) {
@@ -3417,9 +3505,9 @@ function destroyRandomWeapon(p, pIdx) {
     // Charged Shot: one level at a time
     if (p.chargedShotLevel > 0) weapons.push({ name: CHARGED_SHOT_NAMES[p.chargedShotLevel], destroy: () => { p.chargedShotLevel--; p.chargeTimer = 0; } });
 
-    // Mini-Gun: Reactor / Plasmatic Barrels -> Mini-Gun
+    // Mini-Gun: reactors one level at a time / Plasmatic Barrels -> Mini-Gun
     const miniGunTop = [];
-    if (p.hasMiniGunReactor) miniGunTop.push({ name: "Mini-Gun Reactor", destroy: () => { endMiniGunBurst(p); p.hasMiniGunReactor = false; } });
+    if (p.miniGunReactorLevel > 0) miniGunTop.push({ name: MINIGUN_REACTOR_NAMES[p.miniGunReactorLevel], destroy: () => { endMiniGunBurst(p); p.miniGunReactorLevel--; } });
     if (p.hasPlasmaticBarrels) miniGunTop.push({ name: "Plasmatic Barrels", destroy: () => { endMiniGunBurst(p); p.hasPlasmaticBarrels = false; } });
     if (miniGunTop.length > 0) weapons.push(pick(miniGunTop));
     else if (p.hasMiniGun) weapons.push({ name: "Mini-Gun", destroy: () => { endMiniGunBurst(p); p.hasMiniGun = false; p.miniGunCooldown = 0; } });
@@ -3427,7 +3515,7 @@ function destroyRandomWeapon(p, pIdx) {
     if (weapons.length > 0) {
         let chosen = pick(weapons);
         chosen.destroy();
-        weaponLossMessage = { text: (pIdx === 0 ? "P1" : "P2") + " LOST: " + chosen.name, timer: 2000 };
+        notify((pIdx === 0 ? "P1" : "P2") + " LOST: " + chosen.name, "Warning: system damage", '#ff4a3d', 3000);
         updateWeaponMenuButtons();
     }
 }
@@ -3454,7 +3542,7 @@ function countUpgrades(p) {
     if (p.chargedShotLevel >= 4) count++;
     if (p.chargedShotLevel >= 5) count++;
     if (p.hasMiniGun) count++;
-    if (p.hasMiniGunReactor) count++;
+    count += p.miniGunReactorLevel;
     if (p.hasPlasmaticBarrels) count++;
     return count;
 }
@@ -3489,7 +3577,7 @@ function getShipsPerMinBoost() {
 
 // Calculate power up drop rate multiplier based on upgrades
 // Goes from 1.0 (0 upgrades) to 0.05 (all upgrades)
-const MAX_UPGRADES = 21; // Total possible upgrades
+const MAX_UPGRADES = 23; // Total possible upgrades
 function getDropRateMultiplier() {
     // Get the max upgrades across all players
     let maxUpgrades = 0;
@@ -3740,6 +3828,12 @@ window.selectWeapon = function(playerIndex, weaponId) {
     else if (weaponId === 61) {
         textLines = ["Balance the reactor output to", "spin the barrels up faster."];
     }
+    else if (weaponId === 63) {
+        textLines = ["Reactor containment is optional,", "math is not. Calculate the overload."];
+    }
+    else if (weaponId === 64) {
+        textLines = ["This reactor fell off a freighter.", "Don't ask. Just do the math."];
+    }
     else if (weaponId === 62) {
         textLines = ["Plasma coolant flow must be exact", "or the barrels will melt."];
     }
@@ -3845,7 +3939,12 @@ function finalizeUpgrade(success) {
 
         // Mini-Gun: 6=unlock (16s cooldown), 61=Mini-Gun Reactor (8s cooldown), 62=Plasmatic Barrels (40 rounds over 4s)
         else if (wId === 6) { p.hasMiniGun = true; p.miniGunCooldown = 0; weaponName = "Mini-Gun"; }
-        else if (wId === 61) { p.hasMiniGunReactor = true; p.miniGunCooldown = Math.min(p.miniGunCooldown, MINIGUN_REACTOR_COOLDOWN); weaponName = "Mini-Gun Reactor"; }
+        else if (wId === 61 || wId === 63 || wId === 64) {
+            // Reactor chain: 61=Mini-Gun Reactor (8s), 63=Unstable Reactor (4s), 64=Black Market Heck-Fire Reactor (2s)
+            p.miniGunReactorLevel = wId === 61 ? 1 : wId === 63 ? 2 : 3;
+            p.miniGunCooldown = Math.min(p.miniGunCooldown, MINIGUN_COOLDOWNS[p.miniGunReactorLevel]);
+            weaponName = MINIGUN_REACTOR_NAMES[p.miniGunReactorLevel];
+        }
         else if (wId === 62) { p.hasPlasmaticBarrels = true; weaponName = "Plasmatic Barrels"; }
 
         // Power Shield
@@ -3867,10 +3966,7 @@ function finalizeUpgrade(success) {
         else if (wId === 100) {
             p.nukes = p.maxNukes;
             weaponName = "NUKES RELOADED!";
-            levelMessage = "Muusstaaarrrd!!!";
-            levelMessageTimer = 1500; // Total time for 3 flashes
-            mustardFlashCount = 0;
-            mustardFlashTimer = 0;
+            notify("Muusstaaarrrd!!!", "Nukes reloaded", '#ff3df0', 1500, true);
         }
 
         showToast((pIdx===0?"P1":"P2") + " Equipped " + weaponName);
@@ -3985,7 +4081,9 @@ function updateWeaponMenuButtons() {
         if (!p.hasMiniGun) {
             add(6, 'Mini-Gun');
         } else {
-            if (!p.hasMiniGunReactor) add(61, 'Mini-Gun Reactor');
+            if (p.miniGunReactorLevel === 0) add(61, 'Mini-Gun Reactor');
+            else if (p.miniGunReactorLevel === 1) add(63, 'Unstable Reactor');
+            else if (p.miniGunReactorLevel === 2) add(64, 'Black Market Heck-Fire Reactor', 'elite');
             if (!p.hasPlasmaticBarrels) add(62, 'Plasmatic Barrels');
         }
 
@@ -4018,8 +4116,9 @@ function fireChargedBeam(p, owner, angle) {
 // inaccurate rounds, each aimed (not homing) at the nearest enemy
 const MINIGUN_SHOTS = 20; // 40 with Plasmatic Barrels
 const MINIGUN_SHOT_INTERVAL = 100; // 20 rounds over 2s (40 over 4s with Plasmatic Barrels)
-const MINIGUN_COOLDOWN = 16000;
-const MINIGUN_REACTOR_COOLDOWN = 8000;
+// Cooldown at each reactor level: none, Mini-Gun Reactor, Unstable Reactor, Black Market Heck-Fire Reactor
+const MINIGUN_COOLDOWNS = [16000, 8000, 4000, 2000];
+const MINIGUN_REACTOR_NAMES = ['', 'Mini-Gun Reactor', 'Unstable Reactor', 'Black Market Heck-Fire Reactor'];
 const MINIGUN_AIM_VARIATION = 10 * Math.PI / 180; // each round strays up to 10 degrees either way
 const MINIGUN_BULLET_SPEED = 0.7;
 
@@ -4037,7 +4136,7 @@ function endMiniGunBurst(p) {
     if (!p.miniGunFiring) return;
     p.miniGunFiring = false;
     p.miniGunShotsLeft = 0;
-    p.miniGunCooldown = p.hasMiniGunReactor ? MINIGUN_REACTOR_COOLDOWN : MINIGUN_COOLDOWN;
+    p.miniGunCooldown = MINIGUN_COOLDOWNS[p.miniGunReactorLevel];
     if (p.miniGunSound) { p.miniGunSound.stop(); p.miniGunSound = null; }
 }
 
@@ -4116,14 +4215,14 @@ function fireBlaster(p, owner) {
 
 const ROCKET_SPEED_BOOST = 1.3; // Player rockets always move 30% faster
 // Missiles and nukes turn at a limited rate (radians per ms), so they swing round in an arc
-// instead of changing direction instantly. Close to the target they turn up to 4x tighter,
-// so they can't get stuck circling it.
+// instead of changing direction instantly. Missiles always turn at the same rate; nukes turn
+// up to 4x tighter close to their target, so they can't get stuck circling it.
 const ROCKET_TURN_RATE = 0.0035;
 const NUKE_TURN_RATE = 0.0025;
 const MINI_NUKE_TURN_RATE = 0.005;
-function steerToward(m, tx, ty, turnRate, dt) {
+function steerToward(m, tx, ty, turnRate, dt, tightenNearTarget = true) {
     const dx = tx - m.cx, dy = ty - m.cy;
-    const closeness = Math.max(0, 1 - Math.hypot(dx, dy) / 120);
+    const closeness = tightenNearTarget ? Math.max(0, 1 - Math.hypot(dx, dy) / 120) : 0;
     const maxTurn = turnRate * (1 + 3 * closeness) * dt;
     let diff = Math.atan2(dy, dx) - m.heading;
     diff = Math.atan2(Math.sin(diff), Math.cos(diff)); // shortest way round
@@ -4411,21 +4510,6 @@ function update(dt) {
             nextLevelIndex++; levelTransitionPending = false;
         }
     }
-    if(levelMessageTimer > 0) {
-        levelMessageTimer -= dt;
-        // Handle mustard flashing
-        if (levelMessage === "Muusstaaarrrd!!!") {
-            mustardFlashTimer += dt;
-            if (mustardFlashTimer >= 250) { // Flash every 250ms
-                mustardFlashTimer = 0;
-                mustardFlashCount++;
-                if (mustardFlashCount >= 6) { // 3 flashes = 6 toggles (on/off/on/off/on/off)
-                    levelMessageTimer = 0; // End early after 3 flashes
-                }
-            }
-        }
-    }
-    if(weaponLossMessage.timer > 0) weaponLossMessage.timer -= dt;
     animFrame++;
     let lowestRow = -1; enemies.forEach(e => { if(e.type === 'shooter' && e.gridRow > lowestRow) lowestRow = e.gridRow; });
     if(lowestRow < SWARM.lastLowestRow && SWARM.lastLowestRow !== -1 && lowestRow !== -1) SWARM.yBase = HEIGHT * 0.15;
@@ -4540,7 +4624,7 @@ function update(dt) {
                 r.target = visible.length > 0 ? visible[Math.floor(Math.random() * visible.length)] : null;
             }
             r.cx = r.x + r.w/2; r.cy = r.y + r.h/2;
-            if (r.target) steerToward(r, r.target.x + r.target.w/2, r.target.y + r.target.h/2, ROCKET_TURN_RATE, dt);
+            if (r.target) steerToward(r, r.target.x + r.target.w/2, r.target.y + r.target.h/2, ROCKET_TURN_RATE, dt, false);
             let speed = 0.2 * ROCKET_SPEED_BOOST;
             r.vx = Math.cos(r.heading) * speed;
             r.vy = Math.sin(r.heading) * speed;
@@ -4550,7 +4634,9 @@ function update(dt) {
             r.rotation = Math.atan2(r.vy, r.vx) + Math.PI / 2;
             
             if (Math.random() < 0.5) {
-                particles.push({ x: r.x+8, y: r.y+32, vx: (Math.random()-0.5), vy: 2, life: 0.5, color: '#ffaa00', size: 4 });
+                // Exhaust puffs come straight out of the tail, opposite the way the missile points
+                const bx = -Math.cos(r.heading), by = -Math.sin(r.heading);
+                particles.push({ x: r.x + r.w/2 + bx * r.h/2 - 2, y: r.y + r.h/2 + by * r.h/2 - 2, vx: bx * 2 + (Math.random()-0.5) * 0.6, vy: by * 2 + (Math.random()-0.5) * 0.6, life: 0.5, color: '#ffaa00', size: 4 });
             }
         } else if (r.phase === 'exploding') {
             r.explodeTimer -= dt;
@@ -4867,20 +4953,20 @@ function draw() {
     }
     if(!gameStarted && !gameOver) {
         // Mission briefing
-        const w = 560, h = 300, bx = WIDTH/2 - w/2, by = HEIGHT/2 - h/2;
+        const w = 620, h = 340, bx = WIDTH/2 - w/2, by = HEIGHT/2 - h/2;
         drawPanel(bx, by, w, h, '#3fb6ff', 'MISSION BRIEFING');
-        drawGlowText("MATH NUKE", WIDTH/2, by + 82, 42, '#ff3b2f', { metal: true, spacing: 8 });
-        drawGlowText("Highest Reactor Power: " + highPower + "%", WIDTH/2, by + 128, 20, '#47e08a', { font: BODY_FONT, weight: 700, spacing: 1, blur: 8 });
-        ctx.fillStyle = 'rgba(63,182,255,0.4)'; ctx.fillRect(bx + 40, by + 152, w - 80, 1);
+        drawEpicTitle(WIDTH/2, by + 86);
+        drawGlowText("Highest Reactor Power: " + highPower + "%", WIDTH/2, by + 172, 20, '#47e08a', { font: BODY_FONT, weight: 700, spacing: 1, blur: 8 });
+        ctx.fillStyle = 'rgba(63,182,255,0.4)'; ctx.fillRect(bx + 40, by + 196, w - 80, 1);
         if (p1ControlType === 'keyboard') {
-            drawGlowText("PRESS", WIDTH/2 - 110, by + 212, 18, '#cfe8ff', { weight: 700, spacing: 3, blur: 4 });
-            drawKeycap(WIDTH/2 - 10, by + 212, '←');
-            drawKeycap(WIDTH/2 + 52, by + 212, '→');
-            drawGlowText("TO LAUNCH", WIDTH/2 + 160, by + 212, 18, '#cfe8ff', { weight: 700, spacing: 3, blur: 4 });
+            drawGlowText("PRESS", WIDTH/2 - 110, by + 250, 18, '#cfe8ff', { weight: 700, spacing: 3, blur: 4 });
+            drawKeycap(WIDTH/2 - 10, by + 250, '←');
+            drawKeycap(WIDTH/2 + 52, by + 250, '→');
+            drawGlowText("TO LAUNCH", WIDTH/2 + 160, by + 250, 18, '#cfe8ff', { weight: 700, spacing: 3, blur: 4 });
         } else {
-            drawGlowText("Press A Button on Gamepad to Start", WIDTH/2, by + 212, 22, '#cfe8ff', { font: BODY_FONT, weight: 700, spacing: 1, blur: 4 });
+            drawGlowText("Press A Button on Gamepad to Start", WIDTH/2, by + 250, 22, '#cfe8ff', { font: BODY_FONT, weight: 700, spacing: 1, blur: 4 });
         }
-        drawGlowText("SOLVE THE MATH. ARM THE NUKES.", WIDTH/2, by + 266, 11, '#f5c451', { weight: 700, spacing: 4, blur: 6 });
+        drawGlowText("SOLVE THE MATH. ARM THE NUKES.", WIDTH/2, by + 304, 11, '#f5c451', { weight: 700, spacing: 4, blur: 6 });
         return;
     }
     if(gameOver) {
@@ -5138,19 +5224,6 @@ function draw() {
         ctx.restore();
         drawGlowText(formatTimer(gameTime), 62, 28, 18, '#f5c451', { weight: 700, spacing: 2, blur: 6 });
     }
-    if(levelMessageTimer > 0) { 
-        // Special handling for MUSTARD message
-        if (levelMessage === "Muusstaaarrrd!!!" && mustardFlashCount % 2 === 0) {
-            // Only show on even counts (0,2,4 = flash visible)
-            drawBanner(levelMessage, "NUKES RELOADED", '#ff3df0', 90, 1, 56);
-        } else if (levelMessage !== "Muusstaaarrrd!!!") {
-            // Normal level messages
-            const subtitle = levelMessage === "START" ? "ENGAGE ALL HOSTILES" : "HOSTILE WAVE INBOUND";
-            drawBanner(levelMessage, subtitle, '#3fb6ff', HEIGHT/2, levelMessageTimer / 500);
-        }
-    }
-    // Draw weapon loss message
-    if(weaponLossMessage.timer > 0) { drawBanner(weaponLossMessage.text, "WARNING: SYSTEM DAMAGE", '#ff4a3d', HEIGHT/2 + 110, weaponLossMessage.timer / 400, 30); }
     if(continueChallenge.active) { drawContinueChallenge(); }
     else if(mathChallenge.active) { drawMathChallenge(); }
     else if(selectionPaused) {
@@ -5162,7 +5235,7 @@ function draw() {
         const w = 400, h = 170, bx = WIDTH/2 - w/2, by = HEIGHT/2 - h/2;
         drawPanel(bx, by, w, h, '#3fb6ff', gamePaused ? 'SYSTEM' : 'STANDBY');
         drawGlowText("PAUSED", WIDTH/2, by + 90, 40, '#3fb6ff', { metal: true, spacing: 6 });
-        drawGlowText(gamePaused ? "PRESS P TO RESUME" : "MOVE OR FIRE TO RESUME", WIDTH/2, by + 136, 12, '#f5c451', { weight: 700, spacing: 3, blur: 6 });
+        drawGlowText(gamePaused ? "PRESS ESC OR P TO RESUME" : "MOVE OR FIRE TO RESUME", WIDTH/2, by + 136, 12, '#f5c451', { weight: 700, spacing: 3, blur: 6 });
     }
 }
 
@@ -5252,7 +5325,7 @@ window.addEventListener('keydown', e => {
     if(e.key === 'o' || e.code === 'KeyO') { p1Power = 100; powerIsFromBonus[0] = false; }
     // Changed W key behavior - only fill P2 power if P2 is using keyboard for shooting (not using W for movement)
     if((e.key === 'w' || e.code === 'KeyW') && (numPlayers === 1 || p2ControlType !== 'keyboard')) { p2Power = 100; powerIsFromBonus[1] = false; }
-    if((e.key === 'p' || e.code === 'KeyP') && !selectionPaused) { gamePaused = !gamePaused; } 
+    if((e.key === 'p' || e.code === 'KeyP' || e.code === 'Escape') && !selectionPaused) { gamePaused = !gamePaused; } 
     if(e.key === 't' || e.code === 'KeyT') { showTimer = !showTimer; }
     
     // Start game logic - check both player setup and appropriate control scheme
