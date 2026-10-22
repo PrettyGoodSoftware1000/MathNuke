@@ -181,20 +181,20 @@
             border-bottom: 2px solid var(--gold);
             position: relative;
         }
-        /* Sci-fi title: wide heavy block type in polished steel (white over blue-gray with a
-           chrome horizon line), a navy extruded edge, blue glow and a light glint sweeping across */
+        /* Sci-fi title: wide heavy block type in polished steel (white over blue-gray, then a
+           chrome horizon line over a magenta reflection), a navy extruded edge, blue and magenta glow and a light glint sweeping across */
         .epic { position: relative; display: inline-block; font-family: var(--block-font); font-weight: 900; line-height: 1; white-space: nowrap; }
         .epic-depth, .epic-face { display: block; }
         .epic-depth {
             position: absolute; left: 0; top: 0;
             color: #1b3352;
             text-shadow: 1px 1px 0 #172c47, 2px 2px 0 #13253c, 3px 3px 0 #0f1e31, 4px 4px 0 #0b1726,
-                         5px 5px 0 #08111c, 6px 6px 10px rgba(0,0,0,0.9), 0 0 24px rgba(63,182,255,0.55);
+                         5px 5px 0 #08111c, 6px 6px 10px rgba(0,0,0,0.9), 0 0 18px rgba(63,182,255,0.55), 0 0 34px rgba(255,61,240,0.35);
         }
         .epic-face {
             position: relative;
             background: linear-gradient(105deg, transparent 0%, transparent 40%, rgba(255,255,255,0.95) 48%, transparent 56%, transparent 100%),
-                        linear-gradient(180deg, #ffffff 0%, #e4ecf4 30%, #a9bccf 48%, #2d4c70 52%, #5f86ae 78%, #e6f6ff 100%);
+                        linear-gradient(180deg, #ffffff 0%, #e4ecf4 30%, #a9bccf 48%, #2d3c70 52%, #9a3cc8 72%, #ff7df2 88%, #f6e8ff 100%);
             background-size: 250% 100%, 100% 100%;
             background-repeat: no-repeat;
             -webkit-background-clip: text; background-clip: text;
@@ -906,8 +906,8 @@
         .logo .epic-sub { font-size: 14px; letter-spacing: 8px; margin-top: 12px; }
         .logo .epic-sub::before, .logo .epic-sub::after {
             content: ''; display: inline-block; vertical-align: middle; width: 48px; height: 1px; margin: 0 14px;
-            background: linear-gradient(90deg, rgba(63,182,255,0), #8fd3ff, rgba(63,182,255,0));
-            box-shadow: 0 0 6px #3fb6ff;
+            background: linear-gradient(90deg, rgba(255,61,240,0), #ff7df2, rgba(255,61,240,0));
+            box-shadow: 0 0 6px #ff3df0;
         }
 
         .setup-title {
@@ -1820,7 +1820,7 @@ function drawGlowText(text, x, y, size, color, opts = {}) {
 }
 
 // "SPACE PIRATE 3000k" in big extruded sci-fi block type - polished steel with a chrome horizon
-// line, a navy edge, blue glow, a sweeping glint and slowly turning light rays behind it -
+// line over a magenta reflection, a navy edge, blue glow, a sweeping glint and slowly turning light rays behind it -
 // over "INFINITY TIMES A BILLION"
 const BLOCK_FONT = "'Orbitron', 'Eurostile', 'Arial Black', sans-serif";
 const epicTitleCanvas = document.createElement('canvas');
@@ -1833,7 +1833,8 @@ function drawEpicTitle(x, y) {
     for (let k = 0; k < 16; k++) {
         ctx.rotate(Math.PI / 8);
         const ray = ctx.createLinearGradient(0, 0, 260, 0);
-        ray.addColorStop(0, 'rgba(120,200,255,0.2)'); ray.addColorStop(1, 'rgba(40,120,255,0)');
+        if (k % 2) { ray.addColorStop(0, 'rgba(255,90,240,0.16)'); ray.addColorStop(1, 'rgba(255,40,220,0)'); }
+        else { ray.addColorStop(0, 'rgba(120,200,255,0.2)'); ray.addColorStop(1, 'rgba(40,120,255,0)'); }
         ctx.fillStyle = ray;
         ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(260, -16); ctx.lineTo(260, 16); ctx.closePath(); ctx.fill();
     }
@@ -1854,9 +1855,9 @@ function drawEpicTitle(x, y) {
     for (let d = 6; d >= 1; d--) { g.fillStyle = `rgb(${8 + d * 3},${18 + d * 6},${32 + d * 9})`; g.fillText(text, cx + d * 0.8, cy + d); }
     // Polished steel face
     const face = g.createLinearGradient(0, cy - size / 2, 0, cy + size / 2);
-    [[0, '#ffffff'], [0.3, '#e4ecf4'], [0.48, '#a9bccf'], [0.52, '#2d4c70'], [0.78, '#5f86ae'], [1, '#e6f6ff']].forEach(([o, col]) => face.addColorStop(o, col));
+    [[0, '#ffffff'], [0.3, '#e4ecf4'], [0.48, '#a9bccf'], [0.52, '#2d3c70'], [0.72, '#9a3cc8'], [0.88, '#ff7df2'], [1, '#f6e8ff']].forEach(([o, col]) => face.addColorStop(o, col));
     g.fillStyle = face; g.fillText(text, cx, cy);
-    g.strokeStyle = 'rgba(220,240,255,0.6)'; g.lineWidth = 1; g.strokeText(text, cx, cy);
+    g.strokeStyle = 'rgba(255,170,250,0.55)'; g.lineWidth = 1; g.strokeText(text, cx, cy);
     // Glint
     const gx = ((t * 0.45) % 1.6 - 0.3) * tw;
     g.save(); g.globalCompositeOperation = 'source-atop';
@@ -1872,11 +1873,11 @@ function drawEpicTitle(x, y) {
     const sy = y + size / 2 + 22;
     drawGlowText('INFINITY TIMES A BILLION', x, sy, 15, '#d6ecff', { weight: 700, spacing: 6, glow: '#3fb6ff', blur: 12 });
     ctx.save();
-    ctx.shadowColor = '#3fb6ff'; ctx.shadowBlur = 8;
+    ctx.shadowColor = '#ff3df0'; ctx.shadowBlur = 8;
     [-1, 1].forEach(side => {
         const x0 = x + side * 210, x1 = x + side * 270;
         const line = ctx.createLinearGradient(x0, 0, x1, 0);
-        line.addColorStop(0, '#8fd3ff'); line.addColorStop(1, 'rgba(63,182,255,0)');
+        line.addColorStop(0, '#ff7df2'); line.addColorStop(1, 'rgba(255,61,240,0)');
         ctx.fillStyle = line; ctx.fillRect(Math.min(x0, x1), sy - 0.5, 60, 1.5);
     });
     ctx.restore();
@@ -3590,12 +3591,21 @@ function getShipsPerMinBoost() {
     if (maxUpgrades >= 6 && enemies.length < 5) {
         boost += 100;
     }
+    // Rule: 10+ upgrades and <5 enemies = +150 (stacks with above)
+    if (maxUpgrades >= 10 && enemies.length < 5) {
+        boost += 150;
+    }
+    // Rule: 15+ upgrades and <5 enemies = +300 (stacks with above)
+    if (maxUpgrades >= 15 && enemies.length < 5) {
+        boost += 300;
+    }
     return boost;
 }
 
-// Calculate power up drop rate multiplier based on upgrades
-// Goes from 1.0 (0 upgrades) to 0.05 (all upgrades)
+// Calculate power up drop rate multiplier based on upgrades: falls in straight lines between
+// these points - 100% at 0 upgrades, 40% at 10, 15% at 15 and 5% with every upgrade
 const MAX_UPGRADES = 23; // Total possible upgrades
+const DROP_RATE_CURVE = [[0, 1.0], [10, 0.4], [15, 0.15], [MAX_UPGRADES, 0.05]];
 function getDropRateMultiplier() {
     // Get the max upgrades across all players
     let maxUpgrades = 0;
@@ -3606,10 +3616,11 @@ function getDropRateMultiplier() {
         }
     });
     
-    // Linear interpolation from 1.0 to 0.05
-    // At 0 upgrades: 1.0, at MAX_UPGRADES: 0.05
-    let multiplier = 1 - (maxUpgrades / MAX_UPGRADES) * 0.95;
-    return multiplier;
+    for (let k = 1; k < DROP_RATE_CURVE.length; k++) {
+        const [u0, m0] = DROP_RATE_CURVE[k - 1], [u1, m1] = DROP_RATE_CURVE[k];
+        if (maxUpgrades <= u1) return m0 + (m1 - m0) * (maxUpgrades - u0) / (u1 - u0);
+    }
+    return DROP_RATE_CURVE[DROP_RATE_CURVE.length - 1][1];
 }
 
 function handlePlayerHit(p, pIdx) {
