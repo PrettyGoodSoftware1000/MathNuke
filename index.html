@@ -2567,7 +2567,7 @@ const shockwaves = []; // For nuke shockwave effects
 const shieldFragments = []; // For power shield shatter fragments
 const miniNukes = []; // For cluster nuke mini nukes
 const novas = []; // Charged shot energy nova effects
-const MAX_PARTICLES = 600;
+const MAX_PARTICLES = 600; // safety cap for extreme pile-ups (e.g. several nukes); normal play stays well below it
 const pendingNovas = []; // Charged shot impacts, detonated after the enemy update loop
 
 // Nuke explosion radius (reduced from screen-wide)
@@ -3130,10 +3130,10 @@ let spawnTimer = 0;
 
 function lerpAngle(a, b, t) { let diff = b - a; while (diff > Math.PI) diff -= Math.PI * 2; while (diff < -Math.PI) diff += Math.PI * 2; return a + diff * t; }
 function createExplosion(x, y, color, scale = 1.0) {
-    for(let i=0; i<12; i++) particles.push({ x: x, y: y, vx: (Math.random()-0.5)*6, vy: (Math.random()-0.5)*6, life: 1.0, color: color, size: (4+Math.random()*4)*scale });
+    for(let i=0; i<15; i++) particles.push({ x: x, y: y, vx: (Math.random()-0.5)*6, vy: (Math.random()-0.5)*6, life: 1.0, color: color, size: (4+Math.random()*4)*scale });
     particles.push({ x: x - 10*scale, y: y - 10*scale, vx: 0, vy: 0, life: 0.6, color: '#fff2c0', size: 20*scale });
-    for(let i=0; i<5; i++) particles.push({ x: x, y: y, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 0.9, color: i % 2 ? '#ffb347' : '#ff6a1a', size: (6+Math.random()*5)*scale });
-    for(let i=0; i<3; i++) particles.push({ x: x, y: y, vx: (Math.random()-0.5)*1.6, vy: (Math.random()-0.5)*1.6, life: 1.0, color: '#3a3a44', size: (6+Math.random()*5)*scale, smoke: true });
+    for(let i=0; i<8; i++) particles.push({ x: x, y: y, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 0.9, color: i % 2 ? '#ffb347' : '#ff6a1a', size: (6+Math.random()*5)*scale });
+    for(let i=0; i<5; i++) particles.push({ x: x, y: y, vx: (Math.random()-0.5)*1.6, vy: (Math.random()-0.5)*1.6, life: 1.0, color: '#3a3a44', size: (6+Math.random()*5)*scale, smoke: true });
 }
 function formatTimer(ms) { const totalSec = Math.floor(ms / 1000); const m = Math.floor(totalSec / 60); const s = totalSec % 60; return `${m}:${s.toString().padStart(2, '0')}`; }
 
